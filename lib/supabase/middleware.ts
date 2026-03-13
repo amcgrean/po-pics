@@ -2,12 +2,21 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  // Guard: if env vars are missing (e.g. not set on Vercel), fail open
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase env vars — middleware passing through')
+    return NextResponse.next({ request })
+  }
+
   try {
     let supabaseResponse = NextResponse.next({ request })
 
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {
@@ -26,14 +35,19 @@ export async function updateSession(request: NextRequest) {
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
-
     const pathname = request.nextUrl.pathname
 
-    // Public routes
-    if (pathname.startsWith('/login') || pathname.startsWith('/_next') ||
-        pathname.startsWith('/api/') || pathname === '/manifest.webmanifest' ||
-        pathname.startsWith('/icons') || pathname === '/sw.js') {
+    // Public routes — pass through without auth check
+    if (
+      pathname === '/login' ||
+      pathname.startsWith('/login') ||
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/api/') ||
+      pathname === '/manifest.webmanifest' ||
+      pathname.startsWith('/icons') ||
+      pathname === '/sw.js' ||
+      pathname === '/favicon.ico'
+    ) {
       return supabaseResponse
     }
 
@@ -42,6 +56,9 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse
     }
 
+    // Refresh session — required for Server Components to read auth state
+    const { data: { user } } = await supabase.auth.getUser()
+
     // Unauthenticated users → login
     if (!user) {
       const url = request.nextUrl.clone()
@@ -49,7 +66,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Get user role
+    // Get user role for route protection
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -66,9 +83,9 @@ export async function updateSession(request: NextRequest) {
     }
 
     return supabaseResponse
-  } catch {
-    // If middleware throws (e.g. missing env vars, network error), allow the
-    // request through rather than returning a 500 to the user.
+  } catch (err) {
+    // If middleware throws for any reason, fail open to avoid 500s
+    console.error('Middleware error:', err)
     return NextResponse.next({ request })
   }
 }
