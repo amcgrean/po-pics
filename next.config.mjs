@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['@aws-sdk/client-s3'],
   images: {
     remotePatterns: [
       {
