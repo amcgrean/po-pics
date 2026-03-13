@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Exclude heavy AWS SDK from Edge/server component bundles
-  serverExternalPackages: ['@aws-sdk/client-s3'],
   images: {
     remotePatterns: [
       {
@@ -11,6 +9,7 @@ const nextConfig = {
     ],
   },
   experimental: {
+    serverComponentsExternalPackages: ['@aws-sdk/client-s3'],
     serverActions: {
       bodySizeLimit: '12mb',
     },
