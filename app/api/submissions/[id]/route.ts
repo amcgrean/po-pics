@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logError, logWarn } from '@/lib/logger'
 
 export async function GET(
   _request: NextRequest,
@@ -7,9 +8,12 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
+      logWarn('Unauthorized submission detail attempt', { submissionId: params.id })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -25,7 +29,7 @@ export async function GET(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Fetch submission error:', error)
+    logError('Fetch submission error', error, { submissionId: params.id })
     return NextResponse.json({ error: 'Failed to fetch submission' }, { status: 500 })
   }
 }
@@ -36,9 +40,12 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
+      logWarn('Unauthorized submission patch attempt', { submissionId: params.id })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -71,7 +78,7 @@ export async function PATCH(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Update submission error:', error)
+    logError('Update submission error', error, { submissionId: params.id })
     return NextResponse.json({ error: 'Failed to update submission' }, { status: 500 })
   }
 }

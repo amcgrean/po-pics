@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logError, logWarn } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
+      logWarn('Unauthorized submission create attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -42,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
-    console.error('Submission error:', error)
+    logError('Submission error', error)
     return NextResponse.json({ error: 'Failed to save submission' }, { status: 500 })
   }
 }
@@ -50,9 +54,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
+      logWarn('Unauthorized submission list attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -75,7 +82,6 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    // Workers only see their own; supervisors see all
     if (profile?.role !== 'supervisor') {
       query = query.eq('submitted_by', user.id)
     }
@@ -100,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Fetch submissions error:', error)
+    logError('Fetch submissions error', error)
     return NextResponse.json({ error: 'Failed to fetch submissions' }, { status: 500 })
   }
 }

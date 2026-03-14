@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { uploadToR2, generateR2Key } from '@/lib/r2'
+import { logError, logWarn } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
+      logWarn('Unauthorized upload attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -22,12 +26,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No PO number provided' }, { status: 400 })
     }
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
     }
 
-    // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json({ error: 'Image must be under 10MB' }, { status: 400 })
     }
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url, key })
   } catch (error) {
-    console.error('Upload error:', error)
+    logError('Upload error', error)
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }

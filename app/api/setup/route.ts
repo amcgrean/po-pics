@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getEnv, logEnvironmentHealthOnce } from '@/lib/env'
+import { logError, logWarn } from '@/lib/logger'
 
 function checkSecret(request: NextRequest): boolean {
-  const secret = process.env.SETUP_SECRET
-  if (!secret) return false
-  const provided = request.nextUrl.searchParams.get('secret') ||
-    request.headers.get('x-setup-secret')
+  const secret = getEnv('SETUP_SECRET')
+  if (!secret) {
+    logWarn('SETUP_SECRET is missing; setup route is effectively disabled')
+    return false
+  }
+
+  const provided =
+    request.nextUrl.searchParams.get('secret') || request.headers.get('x-setup-secret')
+
   return provided === secret
 }
 
 export async function POST(request: NextRequest) {
+  logEnvironmentHealthOnce('api-setup-post')
+
   if (!checkSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -20,7 +29,10 @@ export async function POST(request: NextRequest) {
     const { username, display_name, password, role, branch } = body
 
     if (!username || !password || !role) {
-      return NextResponse.json({ error: 'username, password, and role are required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'username, password, and role are required' },
+        { status: 400 }
+      )
     }
 
     const email = `${username}@checkin.internal`
@@ -34,7 +46,6 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    // Update profile with all fields (trigger creates base profile)
     await supabase
       .from('profiles')
       .update({ username, display_name, role, branch })
@@ -42,12 +53,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, userId: data.user.id }, { status: 201 })
   } catch (error: any) {
-    console.error('Create user error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to create user' }, { status: 500 })
+    logError('Create user error', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to create user' },
+      { status: 500 }
+    )
   }
 }
 
 export async function GET(request: NextRequest) {
+  logEnvironmentHealthOnce('api-setup-get')
+
   if (!checkSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -63,11 +79,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error: any) {
+    logError('Fetch setup users error', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest) {
+  logEnvironmentHealthOnce('api-setup-delete')
+
   if (!checkSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -85,6 +104,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
+    logError('Delete user error', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

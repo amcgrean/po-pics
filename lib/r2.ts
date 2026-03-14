@@ -1,16 +1,35 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { getEnv } from '@/lib/env'
 
-export const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-})
+function getR2Config() {
+  const accountId = getEnv('R2_ACCOUNT_ID')
+  const accessKeyId = getEnv('R2_ACCESS_KEY_ID')
+  const secretAccessKey = getEnv('R2_SECRET_ACCESS_KEY')
 
-export const R2_BUCKET = process.env.R2_BUCKET_NAME || 'po-checkin-photos'
-export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    throw new Error(
+      'Missing one or more R2 env vars: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY'
+    )
+  }
+
+  return { accountId, accessKeyId, secretAccessKey }
+}
+
+function createR2Client() {
+  const { accountId, accessKeyId, secretAccessKey } = getR2Config()
+
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  })
+}
+
+export const R2_BUCKET = getEnv('R2_BUCKET_NAME') || 'po-checkin-photos'
+export const R2_PUBLIC_URL = getEnv('R2_PUBLIC_URL') || ''
 
 export function generateR2Key(poNumber: string): string {
   const now = new Date()
@@ -27,6 +46,8 @@ export async function uploadToR2(
   body: Buffer,
   contentType: string = 'image/jpeg'
 ): Promise<string> {
+  const r2Client = createR2Client()
+
   await r2Client.send(
     new PutObjectCommand({
       Bucket: R2_BUCKET,
@@ -39,6 +60,8 @@ export async function uploadToR2(
 }
 
 export async function deleteFromR2(key: string): Promise<void> {
+  const r2Client = createR2Client()
+
   await r2Client.send(
     new DeleteObjectCommand({
       Bucket: R2_BUCKET,
