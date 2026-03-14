@@ -1,4 +1,4 @@
-import { logInfo, logWarn } from '@/lib/logger'
+import { logInfo, logWarn } from './logger'
 
 let hasLoggedEnvironment = false
 

@@ -3,8 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import {
   getSupabasePublicEnv,
   logEnvironmentHealthOnce,
-} from '@/lib/env'
-import { logError, logInfo, logWarn, requestLogContext } from '@/lib/logger'
+} from '../env'
+import { logError, logInfo, logWarn, requestLogContext } from '../logger'
 
 export async function updateSession(request: NextRequest) {
   logEnvironmentHealthOnce('middleware')
