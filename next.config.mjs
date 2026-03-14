@@ -8,8 +8,8 @@ const nextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['@aws-sdk/client-s3'],
   experimental: {
+    serverComponentsExternalPackages: ['@aws-sdk/client-s3'],
     serverActions: {
       bodySizeLimit: '12mb',
     },
