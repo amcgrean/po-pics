@@ -38,6 +38,13 @@ export async function updateSession(request: NextRequest) {
       },
     })
 
+    // IMPORTANT: Must call getUser() before any early returns so that
+    // session tokens are refreshed and auth cookies are updated on every request.
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
     const pathname = request.nextUrl.pathname
 
     if (
@@ -56,11 +63,6 @@ export async function updateSession(request: NextRequest) {
     if (pathname.startsWith('/setup')) {
       return supabaseResponse
     }
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
 
     if (userError) {
       logWarn('Failed to get user in middleware', {
