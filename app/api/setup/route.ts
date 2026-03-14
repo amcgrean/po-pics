@@ -103,6 +103,31 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  logEnvironmentHealthOnce('api-setup-patch')
+
+  if (!checkSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const supabase = createServiceClient()
+    const { userId, password } = await request.json()
+
+    if (!userId || !password) {
+      return NextResponse.json({ error: 'userId and password are required' }, { status: 400 })
+    }
+
+    const { error } = await supabase.auth.admin.updateUserById(userId, { password })
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    logError('Reset password error', error)
+    return NextResponse.json({ error: error.message || 'Failed to reset password' }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   logEnvironmentHealthOnce('api-setup-delete')
 

@@ -30,6 +30,8 @@ function SetupContent() {
   })
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [resetting, setResetting] = useState<string | null>(null)
+  const [resetPasswords, setResetPasswords] = useState<Record<string, string>>({})
 
   const authorized = !!secret
 
@@ -71,6 +73,29 @@ function SetupContent() {
       setError(err.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function resetPassword(userId: string, username: string) {
+    const newPassword = resetPasswords[userId]?.trim()
+    if (!newPassword) return
+    setResetting(userId)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await fetch(`/api/setup?secret=${encodeURIComponent(secret)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password: newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSuccess(`Password for "${username}" reset successfully.`)
+      setResetPasswords(p => { const n = { ...p }; delete n[userId]; return n })
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setResetting(null)
     }
   }
 
@@ -233,33 +258,64 @@ function SetupContent() {
           ) : (
             <div className="divide-y divide-gray-100">
               {users.map(user => (
-                <div key={user.id} className="flex items-center gap-4 px-6 py-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{user.username}</span>
-                      {user.display_name && (
-                        <span className="text-sm text-gray-500">({user.display_name})</span>
-                      )}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        user.role === 'supervisor'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {user.role}
-                      </span>
-                      {user.branch && (
-                        <span className="text-xs text-gray-400">{user.branch}</span>
-                      )}
+                <div key={user.id} className="px-6 py-3">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{user.username}</span>
+                        {user.display_name && (
+                          <span className="text-sm text-gray-500">({user.display_name})</span>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          user.role === 'supervisor'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {user.role}
+                        </span>
+                        {user.branch && (
+                          <span className="text-xs text-gray-400">{user.branch}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{user.username}@checkin.internal</p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{user.username}@checkin.internal</p>
+                    <button
+                      onClick={() => setResetPasswords(p =>
+                        p[user.id] !== undefined
+                          ? (() => { const n = { ...p }; delete n[user.id]; return n })()
+                          : { ...p, [user.id]: '' }
+                      )}
+                      className="text-gray-400 hover:text-gray-600 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-50"
+                    >
+                      Reset pw
+                    </button>
+                    <button
+                      onClick={() => deleteUser(user.id, user.username)}
+                      disabled={deleting === user.id}
+                      className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {deleting === user.id ? '…' : 'Delete'}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => deleteUser(user.id, user.username)}
-                    disabled={deleting === user.id}
-                    className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                  >
-                    {deleting === user.id ? '…' : 'Delete'}
-                  </button>
+                  {resetPasswords[user.id] !== undefined && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        value={resetPasswords[user.id]}
+                        onChange={e => setResetPasswords(p => ({ ...p, [user.id]: e.target.value }))}
+                        placeholder="New password"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-green-600"
+                      />
+                      <button
+                        onClick={() => resetPassword(user.id, user.username)}
+                        disabled={resetting === user.id || !resetPasswords[user.id]?.trim()}
+                        className="px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50"
+                        style={{ backgroundColor: '#006834' }}
+                      >
+                        {resetting === user.id ? '…' : 'Save'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
