@@ -6,14 +6,26 @@ import { logError, logWarn } from '@/lib/logger'
 function checkSecret(request: NextRequest): boolean {
   const secret = getEnv('SETUP_SECRET')
   if (!secret) {
-    logWarn('SETUP_SECRET is missing; setup route is effectively disabled')
-    return false
+    // No secret configured — bootstrap requests are allowed (checked below)
+    return true
   }
 
   const provided =
     request.nextUrl.searchParams.get('secret') || request.headers.get('x-setup-secret')
 
   return provided === secret
+}
+
+/** Returns true when there are zero profiles — i.e. first-time setup with no secret. */
+async function isBootstrapAllowed(supabase: any): Promise<boolean> {
+  const secret = getEnv('SETUP_SECRET')
+  if (secret) return true // secret is configured — normal auth flow applies
+
+  const { count } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+
+  return count === 0
 }
 
 export async function POST(request: NextRequest) {
@@ -25,6 +37,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createServiceClient()
+
+    if (!(await isBootstrapAllowed(supabase))) {
+      return NextResponse.json(
+        { error: 'SETUP_SECRET required once users exist' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
     const { username, display_name, password, role, branch } = body
 
@@ -65,7 +84,7 @@ export async function GET(request: NextRequest) {
   logEnvironmentHealthOnce('api-setup-get')
 
   if (!checkSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized — provide ?secret= or x-setup-secret header' }, { status: 401 })
   }
 
   try {
@@ -81,6 +100,31 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     logError('Fetch setup users error', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  logEnvironmentHealthOnce('api-setup-patch')
+
+  if (!checkSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const supabase = createServiceClient()
+    const { userId, password } = await request.json()
+
+    if (!userId || !password) {
+      return NextResponse.json({ error: 'userId and password are required' }, { status: 400 })
+    }
+
+    const { error } = await supabase.auth.admin.updateUserById(userId, { password })
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    logError('Reset password error', error)
+    return NextResponse.json({ error: error.message || 'Failed to reset password' }, { status: 500 })
   }
 }
 
