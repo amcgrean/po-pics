@@ -8,20 +8,21 @@ const nextConfig = {
       },
     ],
   },
+  serverExternalPackages: ['@aws-sdk/client-s3'],
   experimental: {
-    serverComponentsExternalPackages: ['@aws-sdk/client-s3'],
     serverActions: {
       bodySizeLimit: '12mb',
     },
   },
   webpack: (config, { nextRuntime }) => {
     if (nextRuntime === 'edge') {
-      // @supabase/realtime-js depends on `ws` (Node.js WebSocket library)
-      // which uses __dirname — a CommonJS global unavailable in the Edge runtime.
-      // Middleware only needs Supabase auth, not realtime, so exclude ws entirely.
+      // Exclude Node.js-only packages that use __dirname or native bindings,
+      // which are unavailable in the Edge runtime.
       config.resolve.alias = {
         ...config.resolve.alias,
         ws: false,
+        bufferutil: false,
+        'utf-8-validate': false,
       }
     }
     return config
