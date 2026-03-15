@@ -61,6 +61,7 @@ export function getStatusLabel(status: string): string {
 }
 
 export function emailFromUsername(username: string): string {
+  if (username.includes('@')) return username
   return `${username}@checkin.internal`
 }
 
