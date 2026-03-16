@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { emailFromUsername } from '@/lib/utils'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -41,12 +39,8 @@ export default function LoginPage() {
         .eq('id', user.id)
         .single()
 
-      if (profile?.role === 'supervisor') {
-        router.push('/supervisor')
-      } else {
-        router.push('/')
-      }
-      router.refresh()
+      // Hard redirect so the browser commits auth cookies before the server renders
+      window.location.href = profile?.role === 'supervisor' ? '/supervisor' : '/'
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
