@@ -16,7 +16,31 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
   useEffect(() => {
     let scanner: any = null
 
+    function isPermissionError(err: any): boolean {
+      return (
+        err?.name === 'NotAllowedError' ||
+        err?.name === 'PermissionDeniedError' ||
+        err?.message?.toLowerCase().includes('permission') ||
+        err?.message?.toLowerCase().includes('notallowed') ||
+        String(err).toLowerCase().includes('permission')
+      )
+    }
+
     async function startScanner() {
+      // Pre-check camera permission where the Permissions API is supported (not iOS Safari).
+      // On iOS Safari this API is unavailable, so we fall through and let the scanner prompt.
+      try {
+        const permResult = await navigator.permissions.query({ name: 'camera' as PermissionName })
+        if (permResult.state === 'denied') {
+          setError(
+            'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
+          )
+          return
+        }
+      } catch {
+        // navigator.permissions not supported (iOS Safari) — proceed normally
+      }
+
       try {
         const { Html5QrcodeScanner, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
 
@@ -64,14 +88,22 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
             onScan(decodedText)
           },
           (errorMsg: string) => {
-            // Ignore scan errors (continuous scanning noise)
+            // The error callback fires for every unrecognised frame (normal during scanning).
+            // But it can also carry camera permission errors — detect and surface those.
+            if (isPermissionError({ message: errorMsg, name: errorMsg })) {
+              setError(
+                'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
+              )
+            }
           }
         )
 
         setStarted(true)
       } catch (err: any) {
-        if (err?.message?.includes('permission') || err?.name === 'NotAllowedError') {
-          setError('Camera permission denied. Please allow camera access in your browser settings.')
+        if (isPermissionError(err)) {
+          setError(
+            'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
+          )
         } else {
           setError('Could not start camera. Please try again.')
         }

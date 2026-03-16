@@ -35,7 +35,16 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         videoRef.current.onloadedmetadata = () => setCameraReady(true)
       }
     } catch (err: any) {
-      // Fall back to file input on iOS or permission denied
+      const isDenied =
+        err?.name === 'NotAllowedError' ||
+        err?.name === 'PermissionDeniedError' ||
+        err?.message?.toLowerCase().includes('permission')
+      if (isDenied) {
+        setError(
+          'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
+        )
+      }
+      // Fall back to file input (works independently of browser camera permission on iOS)
       setMode('fallback')
     }
   }, [])
@@ -167,14 +176,18 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         ) : (
           <div className="px-6 text-center">
             <div className="text-5xl mb-4">📷</div>
-            <p className="text-white text-base mb-6">
-              Tap below to select a photo from your camera
-            </p>
+            {error ? (
+              <p className="text-red-400 text-base mb-6">{error}</p>
+            ) : (
+              <p className="text-white text-base mb-6">
+                Tap below to take a photo
+              </p>
+            )}
             <button
               onClick={() => fileInputRef.current?.click()}
               className="px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold text-base"
             >
-              Open Camera Roll
+              Open Camera
             </button>
             <input
               ref={fileInputRef}
@@ -192,9 +205,6 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
 
       {/* Footer actions */}
       <div className="bg-black px-6 py-6 safe-bottom">
-        {error && (
-          <p className="text-red-400 text-sm text-center mb-3">{error}</p>
-        )}
 
         {preview ? (
           <div className="flex gap-3">
