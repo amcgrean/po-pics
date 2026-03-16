@@ -8,113 +8,89 @@ interface BarcodeScannerProps {
 }
 
 export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
-  const scannerRef = useRef<any>(null)
-  const containerId = 'html5-qrcode-reader'
   const [error, setError] = useState<string | null>(null)
-  const [started, setStarted] = useState(false)
+  const [isStarting, setIsStarting] = useState(true)
+  const scannerRef = useRef<any>(null)
+  const mountedRef = useRef(true)
+  const containerId = 'html5qr-reader'
 
   useEffect(() => {
-    let scanner: any = null
-
-    function isPermissionError(err: any): boolean {
-      return (
-        err?.name === 'NotAllowedError' ||
-        err?.name === 'PermissionDeniedError' ||
-        err?.message?.toLowerCase().includes('permission') ||
-        err?.message?.toLowerCase().includes('notallowed') ||
-        String(err).toLowerCase().includes('permission')
-      )
-    }
+    mountedRef.current = true
 
     async function startScanner() {
-      // Pre-check camera permission where the Permissions API is supported (not iOS Safari).
-      // On iOS Safari this API is unavailable, so we fall through and let the scanner prompt.
       try {
-        const permResult = await navigator.permissions.query({ name: 'camera' as PermissionName })
-        if (permResult.state === 'denied') {
-          setError(
-            'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
-          )
-          return
-        }
-      } catch {
-        // navigator.permissions not supported (iOS Safari) — proceed normally
-      }
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
 
-      try {
-        const { Html5QrcodeScanner, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
-
-        scanner = new Html5QrcodeScanner(
-          containerId,
-          {
-            fps: 10,
-            qrbox: { width: 280, height: 180 },
-            aspectRatio: 1.0,
-            supportedScanTypes: [],
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.CODE_39,
-              Html5QrcodeSupportedFormats.QR_CODE,
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
-              Html5QrcodeSupportedFormats.CODE_93,
-              Html5QrcodeSupportedFormats.ITF,
-            ],
-            rememberLastUsedCamera: true,
-            showTorchButtonIfSupported: true,
-          },
-          false
-        )
+        const scanner = new Html5Qrcode(containerId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.ITF,
+          ],
+          verbose: false,
+        })
 
         scannerRef.current = scanner
 
-        scanner.render(
+        // Use ideal facingMode so iOS falls back gracefully if back camera unavailable
+        await scanner.start(
+          { facingMode: { ideal: 'environment' } },
+          { fps: 10, qrbox: { width: 280, height: 180 } },
           (decodedText: string) => {
-            // Play beep
             try {
               const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-              const oscillator = ctx.createOscillator()
-              const gainNode = ctx.createGain()
-              oscillator.connect(gainNode)
-              gainNode.connect(ctx.destination)
-              oscillator.frequency.value = 1000
-              gainNode.gain.value = 0.3
-              oscillator.start()
-              oscillator.stop(ctx.currentTime + 0.15)
+              const osc = ctx.createOscillator()
+              const gain = ctx.createGain()
+              osc.connect(gain)
+              gain.connect(ctx.destination)
+              osc.frequency.value = 1000
+              gain.gain.value = 0.3
+              osc.start()
+              osc.stop(ctx.currentTime + 0.15)
             } catch {}
 
-            onScan(decodedText)
+            if (mountedRef.current) onScan(decodedText)
           },
-          (errorMsg: string) => {
-            // The error callback fires for every unrecognised frame (normal during scanning).
-            // But it can also carry camera permission errors — detect and surface those.
-            if (isPermissionError({ message: errorMsg, name: errorMsg })) {
-              setError(
-                'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
-              )
-            }
+          () => {
+            // Per-frame error — normal when no barcode visible, ignore
           }
         )
 
-        setStarted(true)
+        if (mountedRef.current) setIsStarting(false)
       } catch (err: any) {
-        if (isPermissionError(err)) {
+        if (!mountedRef.current) return
+
+        const name = err?.name || ''
+        const msg = (err?.message || String(err)).toLowerCase()
+
+        if (name === 'NotAllowedError' || msg.includes('permission') || msg.includes('notallowed')) {
           setError(
-            'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
+            'Camera access was denied. Go to your browser settings, allow camera for this site, then reload.'
           )
+        } else if (name === 'NotFoundError' || msg.includes('notfound')) {
+          setError('No camera found on this device.')
         } else {
           setError('Could not start camera. Please try again.')
         }
+        setIsStarting(false)
       }
     }
 
     startScanner()
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(() => {})
+      mountedRef.current = false
+      const scanner = scannerRef.current
+      if (scanner) {
+        scanner.stop().catch(() => {}).finally(() => {
+          scanner.clear().catch(() => {})
+        })
       }
     }
   }, [onScan])
@@ -150,7 +126,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           <>
             <div id={containerId} className="w-full max-w-sm" />
             <p className="text-white/70 text-sm mt-4 px-4 text-center">
-              Point your camera at the barcode
+              {isStarting ? 'Starting camera…' : 'Point your camera at the barcode'}
             </p>
           </>
         )}
