@@ -10,6 +10,7 @@ interface Submission {
   id: string
   po_number: string
   image_url: string
+  image_urls?: string[]
   submitted_username: string
   branch: string | null
   notes: string | null
@@ -29,7 +30,7 @@ export default function SubmissionDetailPage() {
   const [reviewerNotes, setReviewerNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [lightbox, setLightbox] = useState(false)
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -82,21 +83,51 @@ export default function SubmissionDetailPage() {
 
   if (!submission) return null
 
+  const photos = submission.image_urls && submission.image_urls.length > 0 
+    ? submission.image_urls 
+    : [submission.image_url]
+
   return (
     <>
       {/* Lightbox */}
-      {lightbox && (
+      {activeImageIndex !== null && (
         <div
-          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-          onClick={() => setLightbox(false)}
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setActiveImageIndex(null)}
         >
-          <img src={submission.image_url} alt="Full size" className="max-w-full max-h-full object-contain" />
+          <img 
+            src={photos[activeImageIndex]} 
+            alt="Full size" 
+            className="max-w-[95%] max-h-[95%] object-contain" 
+          />
           <button
             className="absolute top-4 right-4 text-white text-4xl w-12 h-12 flex items-center justify-center rounded-full bg-black/50"
-            onClick={() => setLightbox(false)}
+            onClick={(e) => { e.stopPropagation(); setActiveImageIndex(null); }}
           >
             ×
           </button>
+          
+          {photos.length > 1 && (
+            <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-4 px-4" onClick={e => e.stopPropagation()}>
+              <button 
+                disabled={activeImageIndex === 0}
+                onClick={() => setActiveImageIndex(activeImageIndex - 1)}
+                className="bg-white/10 text-white px-4 py-2 rounded-full disabled:opacity-20"
+              >
+                ← Prev
+              </button>
+              <span className="text-white/60 self-center text-sm">
+                {activeImageIndex + 1} / {photos.length}
+              </span>
+              <button 
+                disabled={activeImageIndex === photos.length - 1}
+                onClick={() => setActiveImageIndex(activeImageIndex + 1)}
+                className="bg-white/10 text-white px-4 py-2 rounded-full disabled:opacity-20"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -110,19 +141,33 @@ export default function SubmissionDetailPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Photo */}
-        <div>
-          <div
-            className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 cursor-zoom-in"
-            onClick={() => setLightbox(true)}
-          >
-            <img
-              src={submission.image_url}
-              alt={`PO ${submission.po_number}`}
-              className="w-full aspect-video object-cover"
-            />
-            <p className="text-xs text-gray-400 text-center py-2">Click to zoom</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Gallery */}
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>🖼️</span> Photos ({photos.length})
+            </h3>
+            
+            <div className="space-y-4">
+              {photos.map((url, i) => (
+                <div
+                  key={i}
+                  className="bg-gray-50 rounded-xl overflow-hidden cursor-zoom-in border border-gray-100 hover:border-green-300 transition-colors"
+                  onClick={() => setActiveImageIndex(i)}
+                >
+                  <img
+                    src={url}
+                    alt={`Submission photo ${i + 1}`}
+                    className="w-full object-cover"
+                    style={{ maxHeight: '500px' }}
+                  />
+                  <p className="text-[10px] text-gray-400 text-center py-1.5 uppercase tracking-wider">
+                    Photo {i + 1} • Click to enlarge
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

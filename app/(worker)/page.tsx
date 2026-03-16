@@ -13,8 +13,7 @@ export default function WorkerPage() {
   const [step, setStep] = useState<Step>('idle')
   const [poNumber, setPoNumber] = useState('')
   const [poInput, setPoInput] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([])
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -68,12 +67,14 @@ export default function WorkerPage() {
     }
   }
 
-  const handlePhotoCapture = useCallback((file: File) => {
-    setPhoto(file)
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhotoPreview(URL.createObjectURL(file))
+  const handlePhotoCapture = useCallback((files: File[]) => {
+    const newPhotos = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }))
+    setPhotos(prev => [...prev, ...newPhotos])
     setStep('idle')
-  }, [photoPreview])
+  }, [])
 
   const clearPo = () => {
     setPoNumber('')
@@ -81,14 +82,22 @@ export default function WorkerPage() {
     setPoError(null)
   }
 
-  const clearPhoto = () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(null)
-    setPhotoPreview(null)
+  const removePhoto = (index: number) => {
+    setPhotos(prev => {
+      const next = [...prev]
+      URL.revokeObjectURL(next[index].preview)
+      next.splice(index, 1)
+      return next
+    })
+  }
+
+  const clearPhotos = () => {
+    photos.forEach(p => URL.revokeObjectURL(p.preview))
+    setPhotos([])
   }
 
   const reset = () => {
-    clearPhoto()
+    clearPhotos()
     setPoNumber('')
     setPoInput('')
     setNotes('')
@@ -98,36 +107,44 @@ export default function WorkerPage() {
   }
 
   async function handleSubmit() {
-    if (!poNumber || !photo) return
+    if (!poNumber || photos.length === 0) return
     setSubmitting(true)
     setError(null)
 
     try {
-      // Upload image
-      const formData = new FormData()
-      formData.append('image', photo)
-      formData.append('po_number', poNumber)
+      // 1. Upload all images in parallel
+      const uploadPromises = photos.map(async ({ file }) => {
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('po_number', poNumber)
 
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Upload failed')
+        }
+
+        return res.json() as Promise<{ url: string; key: string }>
       })
 
-      if (!uploadRes.ok) {
-        const err = await uploadRes.json()
-        throw new Error(err.error || 'Upload failed')
-      }
+      const uploadResults = await Promise.all(uploadPromises)
+      const imageUrls = uploadResults.map(r => r.url)
+      const imageKeys = uploadResults.map(r => r.key)
 
-      const { url, key } = await uploadRes.json()
-
-      // Create submission record
+      // 2. Create submission record with arrays
       const submitRes = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           po_number: poNumber,
-          image_url: url,
-          image_key: key,
+          image_url: imageUrls[0], // backward compatibility
+          image_key: imageKeys[0], // backward compatibility
+          image_urls: imageUrls,
+          image_keys: imageKeys,
           notes: notes.trim() || null,
         }),
       })
@@ -197,7 +214,7 @@ export default function WorkerPage() {
     )
   }
 
-  const canSubmit = !!poNumber && !!photo && !submitting
+  const canSubmit = !!poNumber && photos.length > 0 && !submitting
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -268,48 +285,49 @@ export default function WorkerPage() {
           )}
         </div>
 
-        {/* Step 2: Photo */}
+        {/* Step 2: Photos */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-3">
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-              style={{ backgroundColor: photo ? '#006834' : (poNumber ? '#6b7280' : '#d1d5db') }}
+              style={{ backgroundColor: photos.length > 0 ? '#006834' : (poNumber ? '#6b7280' : '#d1d5db') }}
             >
-              {photo ? '✓' : '2'}
+              {photos.length > 0 ? '✓' : '2'}
             </div>
             <h2 className={`font-semibold ${poNumber ? 'text-gray-800' : 'text-gray-400'}`}>
-              Take Photo
+              Attach Photos {photos.length > 0 && `(${photos.length})`}
             </h2>
           </div>
 
-          {photo && photoPreview ? (
-            <div className="relative">
-              <img
-                src={photoPreview}
-                alt="Captured"
-                className="w-full h-48 object-cover rounded-xl"
-              />
-              <button
-                onClick={clearPhoto}
-                className="absolute top-2 right-2 bg-black/50 text-white text-xs px-3 py-1.5 rounded-full"
-              >
-                Retake
-              </button>
-            </div>
-          ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((p, i) => (
+              <div key={i} className="relative aspect-square">
+                <img
+                  src={p.preview}
+                  alt=""
+                  className="w-full h-full object-cover rounded-xl"
+                />
+                <button
+                  onClick={() => removePhoto(i)}
+                  className="absolute -top-1 -right-1 bg-red-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border border-white"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
             <button
               onClick={() => setStep('camera')}
               disabled={!poNumber}
-              className="w-full py-4 rounded-xl text-base font-semibold border-2 border-dashed transition-colors disabled:opacity-40"
+              className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-colors disabled:opacity-40"
               style={{
                 borderColor: poNumber ? '#006834' : '#d1d5db',
                 color: poNumber ? '#006834' : '#9ca3af',
               }}
             >
-              <span className="text-2xl block mb-1">📷</span>
-              Open Camera
+              <span className="text-2xl mb-1">📷</span>
+              <span className="text-xs font-semibold">Add</span>
             </button>
-          )}
+          </div>
         </div>
 
         {/* Step 3: Submit */}
@@ -355,10 +373,10 @@ export default function WorkerPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Uploading…
+                Processing {photos.length} photos…
               </>
             ) : (
-              'Submit'
+              'Submit Check-In'
             )}
           </button>
         </div>

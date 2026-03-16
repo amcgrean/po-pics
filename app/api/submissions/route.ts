@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     const body = await request.json()
-    const { po_number, image_url, image_key, notes } = body
+    const { po_number, image_url, image_key, image_urls, image_keys, notes } = body
 
-    if (!po_number || !image_url || !image_key) {
+    if (!po_number || (!image_url && !image_urls)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -31,8 +31,10 @@ export async function POST(request: NextRequest) {
       .from('submissions')
       .insert({
         po_number: po_number.trim().toUpperCase(),
-        image_url,
-        image_key,
+        image_url: image_url || (image_urls?.[0] || null),
+        image_key: image_key || (image_keys?.[0] || null),
+        image_urls: image_urls || (image_url ? [image_url] : []),
+        image_keys: image_keys || (image_key ? [image_key] : []),
         submitted_by: user.id,
         submitted_username: profile?.username || user.email?.split('@')[0],
         branch: profile?.branch,
