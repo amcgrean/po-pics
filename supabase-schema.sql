@@ -47,13 +47,23 @@ create policy "Users read own profile"
   for select
   using (auth.uid() = id);
 
+-- Helper function to get current user's role WITHOUT triggering RLS
+-- (security definer bypasses row-level security, breaking the recursion)
+create or replace function public.get_my_role()
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select role from public.profiles where id = auth.uid()
+$$;
+
 -- Supervisors can read all profiles
 create policy "Supervisors read all profiles"
   on public.profiles
   for select
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'supervisor')
-  );
+  using (public.get_my_role() = 'supervisor');
 
 -- Workers can insert submissions (only as themselves)
 create policy "Workers can submit"
@@ -71,9 +81,7 @@ create policy "Workers read own submissions"
 create policy "Supervisors full access"
   on public.submissions
   for all
-  using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'supervisor')
-  );
+  using (public.get_my_role() = 'supervisor');
 
 -- ---- Trigger: auto-create profile on signup ----
 create or replace function public.handle_new_user()
