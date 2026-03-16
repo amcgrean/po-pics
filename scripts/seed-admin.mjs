@@ -68,16 +68,38 @@ const { data, error } = await supabase.auth.admin.createUser({
 
 if (error) {
   if (error.message?.includes('already been registered')) {
-    console.log(`User "${username}" already exists — updating profile role to supervisor.`)
+    console.log(`User "${username}" already exists — updating password and profile role.`)
+    
+    // Find ID first
+    const { data: existing, error: findErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .single()
+    
+    if (findErr || !existing) {
+      console.error('Failed to find existing user ID:', findErr?.message)
+      process.exit(1)
+    }
+
+    // Update password
+    const { error: resetErr } = await supabase.auth.admin.updateUserById(existing.id, { password })
+    if (resetErr) {
+      console.error('Failed to reset existing user password:', resetErr.message)
+      process.exit(1)
+    }
+
+    // Update profile role
     const { error: profileErr } = await supabase
       .from('profiles')
       .update({ role: 'supervisor', display_name: displayName })
-      .eq('username', username)
+      .eq('id', existing.id)
+    
     if (profileErr) {
       console.error('Profile update failed:', profileErr.message)
       process.exit(1)
     }
-    console.log('Profile updated successfully.')
+    console.log('User and profile updated successfully.')
     printCredentials()
     process.exit(0)
   }
