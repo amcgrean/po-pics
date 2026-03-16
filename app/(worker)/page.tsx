@@ -19,6 +19,7 @@ export default function WorkerPage() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [poError, setPoError] = useState<string | null>(null)
   const [username, setUsername] = useState('')
 
   useEffect(() => {
@@ -38,15 +39,33 @@ export default function WorkerPage() {
   }, [])
 
   const handleBarcodeScan = useCallback((value: string) => {
-    setPoNumber(value.trim().toUpperCase())
-    setPoInput(value.trim().toUpperCase())
+    const digits = value.trim().replace(/\D/g, '')
+    if (/^\d{6,10}$/.test(digits)) {
+      setPoNumber(digits)
+      setPoInput(digits)
+      setPoError(null)
+    } else {
+      setPoError(`Barcode must be 6–10 digits (got "${value.trim()}"). Please scan again.`)
+    }
     setStep('idle')
   }, [])
 
   const handlePoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.toUpperCase()
+    const val = e.target.value.replace(/\D/g, '')
     setPoInput(val)
-    setPoNumber(val)
+    if (val.length === 0) {
+      setPoError(null)
+      setPoNumber('')
+    } else if (val.length < 6) {
+      setPoError(`PO number must be at least 6 digits (${val.length} entered)`)
+      setPoNumber('')
+    } else if (val.length > 10) {
+      setPoError('PO number must be at most 10 digits')
+      setPoNumber('')
+    } else {
+      setPoError(null)
+      setPoNumber(val)
+    }
   }
 
   const handlePhotoCapture = useCallback((file: File) => {
@@ -59,6 +78,7 @@ export default function WorkerPage() {
   const clearPo = () => {
     setPoNumber('')
     setPoInput('')
+    setPoError(null)
   }
 
   const clearPhoto = () => {
@@ -73,6 +93,7 @@ export default function WorkerPage() {
     setPoInput('')
     setNotes('')
     setError(null)
+    setPoError(null)
     setSuccess(false)
   }
 
@@ -229,15 +250,20 @@ export default function WorkerPage() {
               <div className="relative">
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={poInput}
                   onChange={handlePoInputChange}
-                  placeholder="Or type PO number"
+                  placeholder="Or type PO number (6–10 digits)"
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base text-gray-800 placeholder-gray-400 focus:outline-none"
                   onFocus={e => e.target.style.borderColor = '#006834'}
                   onBlur={e => e.target.style.borderColor = '#d1d5db'}
-                  autoCapitalize="characters"
+                  maxLength={10}
                 />
               </div>
+              {poError && (
+                <p className="text-red-600 text-sm mt-2 px-1">{poError}</p>
+              )}
             </>
           )}
         </div>
