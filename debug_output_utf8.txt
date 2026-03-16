@@ -1,0 +1,33 @@
+﻿--- Auth Debug ---
+Project: https://jvpkhonuejxluvtnrygd.supabase.co
+Total users found: 4
+ - ID: 5d2114ce-2aee-429c-b977-6cdec55469ec
+   Email: jeffw@checkin.internal
+   Confirmed: YES
+   Metadata: { display_name: '', email_verified: true, role: 'worker' }
+---
+ - ID: 3af1df8e-9765-48f9-b910-ff12c312b257
+   Email: amcgrean@checkin.internal
+   Confirmed: YES
+   Metadata: { display_name: 'Aaron', email_verified: true, role: 'worker' }
+---
+ - ID: b6fb50b1-098b-47e8-b52d-1b8b046b21c9
+   Email: aaronm@checkin.internal
+   Confirmed: YES
+   Metadata: { display_name: 'aaron m', email_verified: true, role: 'supervisor' }
+---
+ - ID: daefb2d8-64ae-4740-9b0a-30d9351c6b22
+   Email: amcgrean@beisserlumber.com
+   Confirmed: YES
+   Metadata: {
+  display_name: 'Admin User',
+  email_verified: true,
+  role: 'supervisor'
+}
+---
+
+--- Profiles Table ---
+ - Profile: admin (supervisor) ID: daefb2d8-64ae-4740-9b0a-30d9351c6b22
+ - Profile: aaronm (supervisor) ID: b6fb50b1-098b-47e8-b52d-1b8b046b21c9
+ - Profile: amcgrean (worker) ID: 3af1df8e-9765-48f9-b910-ff12c312b257
+ - Profile: jeffw (worker) ID: 5d2114ce-2aee-429c-b977-6cdec55469ec

@@ -1,0 +1,4 @@
+﻿--- RLS Policy Check ---
+RPC inspect_policies failed. Trying manual inference...
+Could not check if RLS is enabled via RPC.
+Access check: SUCCESS

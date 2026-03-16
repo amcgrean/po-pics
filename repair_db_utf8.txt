@@ -1,0 +1,53 @@
+﻿--- Database Repair ---
+Detecting schema mismatch...
+Field "po_number" exists.
+Field "image_url" exists.
+Field "image_key" exists.
+Field "submitted_by" exists.
+Field "submitted_username" exists.
+Field "branch" exists.
+Field "notes" exists.
+Field "status" exists.
+
+NOTE: If any fields are missing, you must add them via the Supabase SQL Editor.
+SQL to fix schema and RLS:
+
+-- 1. Ensure table exists
+CREATE TABLE IF NOT EXISTS submissions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_number TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  image_key TEXT NOT NULL,
+  submitted_by UUID REFERENCES auth.users(id),
+  submitted_username TEXT,
+  branch TEXT,
+  notes TEXT,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Enable RLS
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+
+-- 3. Policies
+DROP POLICY IF EXISTS "Users can insert their own submissions" ON submissions;
+CREATE POLICY "Users can insert their own submissions"
+ON submissions FOR INSERT
+WITH CHECK (auth.uid() = submitted_by);
+
+DROP POLICY IF EXISTS "Users can view their own submissions" ON submissions;
+CREATE POLICY "Users can view their own submissions"
+ON submissions FOR SELECT
+USING (auth.uid() = submitted_by);
+
+DROP POLICY IF EXISTS "Supervisors can view all submissions" ON submissions;
+CREATE POLICY "Supervisors can view all submissions"
+ON submissions FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE profiles.id = auth.uid()
+    AND profiles.role = 'supervisor'
+  )
+);
+  

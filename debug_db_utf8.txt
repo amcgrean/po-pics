@@ -1,0 +1,13 @@
+﻿--- Database Debug (Submissions Table) ---
+RPC get_table_columns failed, trying direct select head...
+Successfully accessed submissions table.
+
+--- Recent Submissions ---
+Found 0 rows.
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé (index) Γöé
+Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+
+--- Test Insert (Service Role) ---
+Test insert SUCCESSFUL.
