@@ -94,10 +94,34 @@ export async function updateSession(request: NextRequest) {
 
     const role = profile?.role
 
-    if (pathname.startsWith('/supervisor') && role !== 'supervisor') {
+    if (pathname === '/' || pathname === '') {
+      if (role === 'supervisor') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/supervisor'
+        return NextResponse.redirect(url)
+      }
+      if (role === 'manager') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/manager'
+        return NextResponse.redirect(url)
+      }
+    }
+
+    if (pathname.startsWith('/supervisor') && !(['supervisor', 'manager'].includes(role || ''))) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
-      logInfo('Redirecting non-supervisor from supervisor route', {
+      logInfo('Redirecting non-elevated user from supervisor route', {
+        ...requestLogContext(request),
+        userId: user.id,
+        role,
+      })
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/manager') && !(['supervisor', 'manager'].includes(role || ''))) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      logInfo('Redirecting non-elevated user from manager route', {
         ...requestLogContext(request),
         userId: user.id,
         role,
