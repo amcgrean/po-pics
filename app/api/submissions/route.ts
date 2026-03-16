@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('username, branch')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     const body = await request.json()
     const { po_number, image_url, image_key, notes } = body
@@ -67,7 +67,9 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
+
+    const userRole = profile?.role || user.app_metadata?.role || user.user_metadata?.role
 
     const { searchParams } = new URL(request.url)
     const poSearch = searchParams.get('po_number')
@@ -82,7 +84,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (profile?.role !== 'supervisor') {
+    if (userRole !== 'supervisor') {
       query = query.eq('submitted_by', user.id)
     }
 
@@ -94,7 +96,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
-    if (profile?.role === 'supervisor' && !poSearch) {
+    if (userRole === 'supervisor' && !poSearch) {
       const since = new Date()
       since.setDate(since.getDate() - days)
       query = query.gte('created_at', since.toISOString())
