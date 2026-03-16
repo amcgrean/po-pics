@@ -17,9 +17,14 @@ export function getEnv(name: string): string | undefined {
 }
 
 export function getSupabasePublicEnv() {
+  // We use direct process.env access here so Next.js can inline these values 
+  // during the build process for the browser.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
   return {
-    url: readEnv('NEXT_PUBLIC_SUPABASE_URL'),
-    anonKey: readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+    url,
+    anonKey,
   }
 }
 
