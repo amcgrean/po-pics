@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
 interface User {
@@ -14,9 +13,6 @@ interface User {
 }
 
 function SetupContent() {
-  const searchParams = useSearchParams()
-  const secret = searchParams.get('secret') || ''
-
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -33,14 +29,12 @@ function SetupContent() {
   const [resetting, setResetting] = useState<string | null>(null)
   const [resetPasswords, setResetPasswords] = useState<Record<string, string>>({})
 
-  const authorized = !!secret
-
   async function loadUsers() {
-    if (!authorized) return
     setLoading(true)
+    setError('')
     try {
-      const res = await fetch(`/api/setup?secret=${encodeURIComponent(secret)}`)
-      if (!res.ok) throw new Error('Unauthorized')
+      const res = await fetch('/api/setup')
+      if (!res.ok) throw new Error('Admin access required')
       setUsers(await res.json())
     } catch (err: any) {
       setError(err.message)
@@ -51,7 +45,7 @@ function SetupContent() {
 
   useEffect(() => {
     loadUsers()
-  }, [secret])
+  }, [])
 
   async function createUser(e: React.FormEvent) {
     e.preventDefault()
@@ -59,7 +53,7 @@ function SetupContent() {
     setError('')
     setSuccess('')
     try {
-      const res = await fetch(`/api/setup?secret=${encodeURIComponent(secret)}`, {
+      const res = await fetch('/api/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -83,7 +77,7 @@ function SetupContent() {
     setError('')
     setSuccess('')
     try {
-      const res = await fetch(`/api/setup?secret=${encodeURIComponent(secret)}`, {
+      const res = await fetch('/api/setup', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, password: newPassword }),
@@ -103,7 +97,7 @@ function SetupContent() {
     if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return
     setDeleting(userId)
     try {
-      const res = await fetch(`/api/setup?secret=${encodeURIComponent(secret)}`, {
+      const res = await fetch('/api/setup', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
@@ -117,24 +111,9 @@ function SetupContent() {
     }
   }
 
-  if (!authorized) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-sm border">
-          <div className="text-4xl mb-4">🔒</div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Setup Required</h1>
-          <p className="text-sm text-gray-500">
-            Access this page with <code className="bg-gray-100 px-1 rounded">?secret=YOUR_SETUP_SECRET</code>
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-1">
             <div
@@ -145,7 +124,7 @@ function SetupContent() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Setup & User Management</h1>
           </div>
-          <p className="text-sm text-gray-500 ml-13">PO Check-In Admin</p>
+          <p className="text-sm text-gray-500 ml-13">PO Check-In Admin (supervisor/manager only)</p>
         </div>
 
         {error && (
@@ -160,7 +139,6 @@ function SetupContent() {
           </div>
         )}
 
-        {/* Create user form */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
           <h2 className="font-semibold text-gray-800 mb-4">Create New User</h2>
           <form onSubmit={createUser} className="space-y-4">
@@ -236,7 +214,6 @@ function SetupContent() {
           </form>
         </div>
 
-        {/* User list */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-gray-800">
@@ -322,7 +299,6 @@ function SetupContent() {
           )}
         </div>
 
-        {/* Initial users note */}
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-4 text-sm text-blue-700">
           <p className="font-medium mb-2">Initial users to create:</p>
           <div className="grid grid-cols-2 gap-1 font-mono text-xs">

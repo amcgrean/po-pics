@@ -1,49 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
-import { getEnv, logEnvironmentHealthOnce } from '@/lib/env'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logEnvironmentHealthOnce } from '@/lib/env'
 import { logError, logWarn } from '@/lib/logger'
 
-function checkSecret(request: NextRequest): boolean {
-  const secret = getEnv('SETUP_SECRET')
-  if (!secret) {
-    // No secret configured — bootstrap requests are allowed (checked below)
-    return true
+async function requireAdminUser() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
 
-  const provided =
-    request.nextUrl.searchParams.get('secret') || request.headers.get('x-setup-secret')
-
-  return provided === secret
-}
-
-/** Returns true when there are zero profiles — i.e. first-time setup with no secret. */
-async function isBootstrapAllowed(supabase: any): Promise<boolean> {
-  const secret = getEnv('SETUP_SECRET')
-  if (secret) return true // secret is configured — normal auth flow applies
-
-  const { count } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('*', { count: 'exact', head: true })
+    .select('role')
+    .eq('id', user.id)
+    .single()
 
-  return count === 0
+  if (profileError) {
+    logWarn('Setup API role check failed', { userId: user.id, error: profileError.message })
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+
+  if (!['supervisor', 'manager'].includes(profile?.role || '')) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+
+  return { user }
 }
 
 export async function POST(request: NextRequest) {
   logEnvironmentHealthOnce('api-setup-post')
 
-  if (!checkSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAdminUser()
+  if (auth.error) return auth.error
 
   try {
     const supabase = createServiceClient()
-
-    if (!(await isBootstrapAllowed(supabase))) {
-      return NextResponse.json(
-        { error: 'SETUP_SECRET required once users exist' },
-        { status: 401 }
-      )
-    }
     const body = await request.json()
     const { username, display_name, password, role, branch } = body
 
@@ -80,12 +75,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   logEnvironmentHealthOnce('api-setup-get')
 
-  if (!checkSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized — provide ?secret= or x-setup-secret header' }, { status: 401 })
-  }
+  const auth = await requireAdminUser()
+  if (auth.error) return auth.error
 
   try {
     const supabase = createServiceClient()
@@ -106,9 +100,8 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   logEnvironmentHealthOnce('api-setup-patch')
 
-  if (!checkSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAdminUser()
+  if (auth.error) return auth.error
 
   try {
     const supabase = createServiceClient()
@@ -131,9 +124,8 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   logEnvironmentHealthOnce('api-setup-delete')
 
-  if (!checkSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAdminUser()
+  if (auth.error) return auth.error
 
   try {
     const supabase = createServiceClient()
