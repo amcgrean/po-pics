@@ -41,7 +41,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         err?.message?.toLowerCase().includes('permission')
       if (isDenied) {
         setError(
-          'Camera access was denied. On iPhone, go to Settings > Safari > Camera and set it to "Allow", then reload the page.'
+          'Camera access was denied. iPhone: Settings › Safari › Camera › Allow. Android: tap the lock icon in your browser address bar and enable Camera. Then reload.'
         )
       }
       setMode('fallback')
@@ -169,8 +169,9 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
               className="max-w-full max-h-full object-contain"
             />
             {!cameraReady && !error && (
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                 <p className="text-white/70 text-sm">Starting camera…</p>
+                <p className="text-white/45 text-xs px-8 text-center">If prompted, tap <span className="text-white/70 font-semibold">Allow</span> to enable camera access</p>
               </div>
             )}
           </>

@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { createClient } from '@/lib/supabase/client'
 
 const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false })
 const CameraCapture = dynamic(() => import('@/components/CameraCapture'), { ssr: false })
@@ -19,23 +18,6 @@ export default function WorkerPage() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [poError, setPoError] = useState<string | null>(null)
-  const [username, setUsername] = useState('')
-
-  useEffect(() => {
-    async function loadUser() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username, display_name')
-          .eq('id', user.id)
-          .single()
-        setUsername(profile?.display_name || profile?.username || '')
-      }
-    }
-    loadUser()
-  }, [])
 
   const handleBarcodeScan = useCallback((value: string) => {
     const digits = value.trim().replace(/\D/g, '')
@@ -169,12 +151,6 @@ export default function WorkerPage() {
     }
   }
 
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = '/login'
-  }
-
   // Scanner overlay
   if (step === 'scanning') {
     return (
@@ -218,24 +194,6 @@ export default function WorkerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="text-white px-4 py-4 safe-top" style={{ backgroundColor: '#006834' }}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">PO Check-In</h1>
-            {username && (
-              <p className="text-sm text-white/70">Hi, {username}</p>
-            )}
-          </div>
-          <button
-            onClick={handleLogout}
-            className="text-white/70 text-sm active:text-white"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-
       <div className="px-4 py-6 space-y-4 max-w-lg mx-auto">
         {/* Step 1: PO Number */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
