@@ -155,9 +155,14 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         ) : (
           <>
             <div id={containerId} className="w-full max-w-sm overflow-hidden rounded-xl bg-gray-900" style={{ minHeight: '300px' }} />
-            <p className="text-white/70 text-sm mt-6 px-4 text-center">
-              {isStarting ? 'Starting camera…' : 'Center the barcode in the rectangle'}
-            </p>
+            {isStarting ? (
+              <div className="mt-6 px-6 text-center space-y-1">
+                <p className="text-white/70 text-sm">Starting camera…</p>
+                <p className="text-white/45 text-xs">If your device asks for camera access, tap <span className="text-white/70 font-semibold">Allow</span></p>
+              </div>
+            ) : (
+              <p className="text-white/70 text-sm mt-6 px-4 text-center">Center the barcode in the rectangle</p>
+            )}
           </>
         )}
       </div>
