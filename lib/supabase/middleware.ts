@@ -61,9 +61,6 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse
     }
 
-    if (pathname.startsWith('/setup')) {
-      return supabaseResponse
-    }
 
     if (userError) {
       logWarn('Failed to get user in middleware', {
@@ -106,6 +103,18 @@ export async function updateSession(request: NextRequest) {
         url.pathname = '/manager'
         return NextResponse.redirect(url)
       }
+    }
+
+
+    if (pathname.startsWith('/setup') && !(['supervisor', 'manager'].includes(role || ''))) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      logInfo('Redirecting non-admin user from setup route', {
+        ...requestLogContext(request),
+        userId: user.id,
+        role,
+      })
+      return NextResponse.redirect(url)
     }
 
     if (pathname.startsWith('/supervisor') && !(['supervisor', 'manager'].includes(role || ''))) {

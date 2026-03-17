@@ -58,12 +58,15 @@ R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
 R2_BUCKET_NAME=po-checkin-photos
 R2_PUBLIC_URL=https://pub-xxxx.r2.dev
 
-SETUP_SECRET=change-me-to-something-secret
 ```
 
 ### 4. Create Users via /setup
 
-Navigate to `/setup?secret=YOUR_SETUP_SECRET` after deployment to create users.
+1. Log in with your supervisor/manager account.
+2. Open `/setup`.
+3. Create/reset/delete users as needed.
+
+> `/setup` and `/api/setup` are now protected by normal Supabase login + role checks (`supervisor`/`manager`). No setup secret query/header is required.
 
 Initial users to create (all as `worker` role):
 
@@ -93,12 +96,23 @@ Workers log in with: `username` + their password (the email format `username@che
 
 ## User Management
 
-The `/setup?secret=YOUR_SETUP_SECRET` page lets you:
+The `/setup` page lets you:
 - Create new users (no Supabase dashboard access needed)
 - View all existing users
+- Reset user passwords
 - Delete users
 
-Keep your `SETUP_SECRET` private — it's the only protection on this route.
+### Recommended operating process
+
+- Keep one trusted supervisor/manager account for user administration.
+- If possible, enable MFA for that admin account in Supabase Auth settings.
+- Workers can continue using username+password without MFA for easier yard workflow.
+
+### Password handling
+
+- **Do not send passwords in chat, tickets, or plaintext docs.**
+- Store admin credentials in a password manager (1Password/Bitwarden/etc).
+- For new workers, set a temporary password and reset it when needed via `/setup`.
 
 ---
 
