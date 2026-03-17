@@ -53,6 +53,7 @@ export async function updateSession(request: NextRequest) {
       pathname.startsWith('/_next') ||
       pathname.startsWith('/api/') ||
       pathname === '/manifest.webmanifest' ||
+      pathname === '/offline.html' ||
       pathname.startsWith('/icons') ||
       pathname === '/sw.js' ||
       pathname === '/favicon.ico'

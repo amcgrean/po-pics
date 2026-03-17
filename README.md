@@ -147,6 +147,12 @@ supabase-schema.sql     # Run in Supabase SQL Editor
 
 Once installed, the app runs fullscreen with no browser chrome — feels native.
 
+### Offline Behavior
+
+- A service worker is generated at build time via `next-pwa`.
+- Cached app routes/assets can still load during poor connectivity.
+- If a non-cached page is requested while offline, the app falls back to `/offline.html`.
+
 ---
 
 ## Barcode Support
