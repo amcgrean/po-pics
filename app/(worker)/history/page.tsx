@@ -37,13 +37,8 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="text-white px-4 py-4 safe-top" style={{ backgroundColor: '#006834' }}>
-        <h1 className="text-xl font-bold">My Submissions</h1>
-        <p className="text-sm text-white/70">Last 20 check-ins</p>
-      </div>
-
       <div className="px-4 py-4 max-w-lg mx-auto">
+        <h2 className="text-base font-semibold text-gray-700 mb-3">My Submissions <span className="text-xs font-normal text-gray-400">— last 20</span></h2>
         {loading && (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (

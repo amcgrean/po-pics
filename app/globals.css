@@ -29,4 +29,8 @@ html, body {
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
+  /* Top padding that accounts for the fixed header + device safe area (notch/status bar) */
+  .pt-header {
+    padding-top: calc(4rem + env(safe-area-inset-top));
+  }
 }
