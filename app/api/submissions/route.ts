@@ -39,12 +39,22 @@ export async function POST(request: NextRequest) {
         submitted_username: profile?.username || user.email?.split('@')[0],
         branch: profile?.branch,
         notes: notes?.trim() || null,
-        status: 'pending',
+        status: 'submitted',
       })
       .select()
       .single()
 
     if (error) throw error
+
+    // Insert audit log entry for creation
+    await supabase.from('submission_audit_log').insert({
+      submission_id: data.id,
+      action: 'created',
+      new_status: 'submitted',
+      changed_by: user.id,
+      changed_by_username: profile?.username || user.email?.split('@')[0],
+      photo_count_added: (image_urls || (image_url ? [image_url] : [])).length,
+    })
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
@@ -86,7 +96,9 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (userRole !== 'supervisor') {
+    const isElevated = userRole === 'supervisor' || userRole === 'manager'
+
+    if (!isElevated) {
       query = query.eq('submitted_by', user.id)
     }
 
@@ -98,7 +110,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
-    if (userRole === 'supervisor' && !poSearch) {
+    if (isElevated && !poSearch) {
       const since = new Date()
       since.setDate(since.getDate() - days)
       query = query.gte('created_at', since.toISOString())

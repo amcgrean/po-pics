@@ -61,7 +61,7 @@ export default function ManagerPage() {
   }, [fetchSubmissions])
 
   const todayCount = submissions.filter(s => isToday(s.created_at)).length
-  const pendingCount = submissions.filter(s => s.status === 'pending').length
+  const pendingCount = submissions.filter(s => s.status === 'submitted' || s.status === 'pending').length
   const weekCount = submissions.length
 
   return (
@@ -107,7 +107,8 @@ export default function ManagerPage() {
               className="px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-600 bg-white"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
+              <option value="submitted">Submitted</option>
+              <option value="pending">Pending (legacy)</option>
               <option value="reviewed">Reviewed</option>
               <option value="flagged">Flagged</option>
             </select>

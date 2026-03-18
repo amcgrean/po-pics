@@ -20,12 +20,24 @@ interface Submission {
   created_at: string
 }
 
+interface AuditEntry {
+  id: string
+  action: string
+  old_status: string | null
+  new_status: string | null
+  changed_by_username: string | null
+  photo_count_added: number | null
+  notes: string | null
+  created_at: string
+}
+
 export default function SubmissionDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
 
   const [submission, setSubmission] = useState<Submission | null>(null)
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [reviewerNotes, setReviewerNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -35,11 +47,15 @@ export default function SubmissionDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/submissions/${id}`)
-        if (!res.ok) throw new Error('Not found')
-        const data = await res.json()
-        setSubmission(data)
-        setReviewerNotes(data.reviewer_notes || '')
+        const [subRes, auditRes] = await Promise.all([
+          fetch(`/api/submissions/${id}`),
+          fetch(`/api/submissions/${id}/audit`),
+        ])
+        if (!subRes.ok) throw new Error('Not found')
+        const [subData, auditData] = await Promise.all([subRes.json(), auditRes.json()])
+        setSubmission(subData)
+        setReviewerNotes(subData.reviewer_notes || '')
+        setAuditLog(Array.isArray(auditData) ? auditData : [])
       } catch {
         router.push('/supervisor')
       } finally {
@@ -60,13 +76,33 @@ export default function SubmissionDetailPage() {
         body: JSON.stringify({ status: newStatus, reviewer_notes: reviewerNotes }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      const updated = await res.json()
+      const [updated, updatedAudit] = await Promise.all([
+        res.json(),
+        fetch(`/api/submissions/${id}/audit`).then(r => r.json()),
+      ])
       setSubmission(updated)
       setReviewerNotes(updated.reviewer_notes || '')
+      setAuditLog(Array.isArray(updatedAudit) ? updatedAudit : [])
     } catch (err: any) {
       setSaveError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  function auditLabel(entry: AuditEntry): string {
+    switch (entry.action) {
+      case 'created':
+        return `Submitted with ${entry.photo_count_added ?? 0} photo${(entry.photo_count_added ?? 0) !== 1 ? 's' : ''}`
+      case 'photos_added':
+        return `Added ${entry.photo_count_added ?? 0} photo${(entry.photo_count_added ?? 0) !== 1 ? 's' : ''}`
+      case 'status_changed': {
+        const from = entry.old_status ? entry.old_status.charAt(0).toUpperCase() + entry.old_status.slice(1) : '?'
+        const to = entry.new_status ? entry.new_status.charAt(0).toUpperCase() + entry.new_status.slice(1) : '?'
+        return `Status: ${from} → ${to}`
+      }
+      default:
+        return entry.action
     }
   }
 
@@ -83,9 +119,11 @@ export default function SubmissionDetailPage() {
 
   if (!submission) return null
 
-  const photos = submission.image_urls && submission.image_urls.length > 0 
-    ? submission.image_urls 
+  const photos = submission.image_urls && submission.image_urls.length > 0
+    ? submission.image_urls
     : [submission.image_url]
+
+  const canReset = submission.status === 'reviewed' || submission.status === 'flagged'
 
   return (
     <>
@@ -95,10 +133,10 @@ export default function SubmissionDetailPage() {
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
           onClick={() => setActiveImageIndex(null)}
         >
-          <img 
-            src={photos[activeImageIndex]} 
-            alt="Full size" 
-            className="max-w-[95%] max-h-[95%] object-contain" 
+          <img
+            src={photos[activeImageIndex]}
+            alt="Full size"
+            className="max-w-[95%] max-h-[95%] object-contain"
           />
           <button
             className="absolute top-4 right-4 text-white text-4xl w-12 h-12 flex items-center justify-center rounded-full bg-black/50"
@@ -106,10 +144,10 @@ export default function SubmissionDetailPage() {
           >
             ×
           </button>
-          
+
           {photos.length > 1 && (
             <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-4 px-4" onClick={e => e.stopPropagation()}>
-              <button 
+              <button
                 disabled={activeImageIndex === 0}
                 onClick={() => setActiveImageIndex(activeImageIndex - 1)}
                 className="bg-white/10 text-white px-4 py-2 rounded-full disabled:opacity-20"
@@ -119,7 +157,7 @@ export default function SubmissionDetailPage() {
               <span className="text-white/60 self-center text-sm">
                 {activeImageIndex + 1} / {photos.length}
               </span>
-              <button 
+              <button
                 disabled={activeImageIndex === photos.length - 1}
                 onClick={() => setActiveImageIndex(activeImageIndex + 1)}
                 className="bg-white/10 text-white px-4 py-2 rounded-full disabled:opacity-20"
@@ -148,7 +186,7 @@ export default function SubmissionDetailPage() {
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span>🖼️</span> Photos ({photos.length})
             </h3>
-            
+
             <div className="space-y-4">
               {photos.map((url, i) => (
                 <div
@@ -245,13 +283,13 @@ export default function SubmissionDetailPage() {
               </button>
             </div>
 
-            {submission.status !== 'pending' && (
+            {canReset && (
               <button
-                onClick={() => updateStatus('pending')}
+                onClick={() => updateStatus('submitted')}
                 disabled={saving}
                 className="w-full mt-2 py-2 rounded-xl text-gray-600 text-sm border border-gray-300 disabled:opacity-50"
               >
-                Reset to Pending
+                Reset to Submitted
               </button>
             )}
 
@@ -261,6 +299,52 @@ export default function SubmissionDetailPage() {
               </p>
             )}
           </div>
+
+          {/* Audit History */}
+          {auditLog.length > 0 && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <h3 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wide">Audit History</h3>
+              <div className="relative">
+                <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-100" />
+                <div className="space-y-4">
+                  {auditLog.map((entry) => (
+                    <div key={entry.id} className="flex gap-3 relative">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex-shrink-0 flex items-center justify-center z-10">
+                        {entry.action === 'created' && (
+                          <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                        {entry.action === 'photos_added' && (
+                          <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                        {entry.action === 'status_changed' && (
+                          <svg className="w-3 h-3 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pb-1">
+                        <p className="text-sm text-gray-800">{auditLabel(entry)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {entry.changed_by_username && (
+                            <span className="font-medium text-gray-600">{entry.changed_by_username} · </span>
+                          )}
+                          {formatDateTime(entry.created_at)}
+                        </p>
+                        {entry.notes && (
+                          <p className="text-xs text-gray-500 italic mt-1">"{entry.notes}"</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

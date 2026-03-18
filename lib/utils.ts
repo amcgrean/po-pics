@@ -40,6 +40,8 @@ export function isToday(dateString: string): boolean {
 
 export function getStatusColor(status: string): string {
   switch (status) {
+    case 'submitted':
+      return 'bg-blue-100 text-blue-800'
     case 'reviewed':
       return 'bg-green-100 text-green-800'
     case 'flagged':
@@ -51,6 +53,8 @@ export function getStatusColor(status: string): string {
 
 export function getStatusLabel(status: string): string {
   switch (status) {
+    case 'submitted':
+      return 'Submitted'
     case 'reviewed':
       return 'Reviewed'
     case 'flagged':
