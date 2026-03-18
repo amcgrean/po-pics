@@ -39,6 +39,8 @@ export default function SubmissionDetailPage() {
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [auditLoading, setAuditLoading] = useState(true)
+  const [auditError, setAuditError] = useState(false)
   const [reviewerNotes, setReviewerNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -61,18 +63,29 @@ export default function SubmissionDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  const loadAudit = useCallback(async () => {
+    setAuditLoading(true)
+    setAuditError(false)
+    try {
+      const res = await fetch(`/api/submissions/${id}/audit`)
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setAuditLog(Array.isArray(data) ? data : [])
+    } catch {
+      setAuditError(true)
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [id])
+
   useEffect(() => {
     async function load() {
       try {
-        const [subRes, auditRes] = await Promise.all([
-          fetch(`/api/submissions/${id}`),
-          fetch(`/api/submissions/${id}/audit`),
-        ])
+        const subRes = await fetch(`/api/submissions/${id}`)
         if (!subRes.ok) throw new Error('Not found')
-        const [subData, auditData] = await Promise.all([subRes.json(), auditRes.json()])
+        const subData = await subRes.json()
         setSubmission(subData)
         setReviewerNotes(subData.reviewer_notes || '')
-        setAuditLog(Array.isArray(auditData) ? auditData : [])
       } catch {
         router.push('/supervisor')
       } finally {
@@ -80,7 +93,8 @@ export default function SubmissionDetailPage() {
       }
     }
     load()
-  }, [id, router])
+    loadAudit()
+  }, [id, router, loadAudit])
 
   async function updateStatus(newStatus: string) {
     if (!submission) return
@@ -93,13 +107,10 @@ export default function SubmissionDetailPage() {
         body: JSON.stringify({ status: newStatus, reviewer_notes: reviewerNotes }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      const [updated, updatedAudit] = await Promise.all([
-        res.json(),
-        fetch(`/api/submissions/${id}/audit`).then(r => r.json()),
-      ])
+      const updated = await res.json()
       setSubmission(updated)
       setReviewerNotes(updated.reviewer_notes || '')
-      setAuditLog(Array.isArray(updatedAudit) ? updatedAudit : [])
+      await loadAudit()
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -321,9 +332,21 @@ export default function SubmissionDetailPage() {
           </div>
 
           {/* Audit History */}
-          {auditLog.length > 0 && (
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wide">Audit History</h3>
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wide">Audit Trail</h3>
+
+            {auditLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <svg className="animate-spin w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              </div>
+            ) : auditError ? (
+              <p className="text-xs text-red-400 text-center py-4">Failed to load audit history.</p>
+            ) : auditLog.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No activity recorded for this PO yet.</p>
+            ) : (
               <div className="relative">
                 <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-100" />
                 <div className="space-y-4">
@@ -363,8 +386,8 @@ export default function SubmissionDetailPage() {
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </>
