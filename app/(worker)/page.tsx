@@ -8,6 +8,9 @@ const CameraCapture = dynamic(() => import('@/components/CameraCapture'), { ssr:
 
 type Step = 'idle' | 'scanning' | 'camera' | 'done'
 
+const MAX_PHOTOS = 10
+const MAX_NOTES_LENGTH = 500
+
 export default function WorkerPage() {
   const [step, setStep] = useState<Step>('idle')
   const [poNumber, setPoNumber] = useState('')
@@ -50,11 +53,15 @@ export default function WorkerPage() {
   }
 
   const handlePhotoCapture = useCallback((files: File[]) => {
-    const newPhotos = files.map(file => ({
-      file,
-      preview: URL.createObjectURL(file)
-    }))
-    setPhotos(prev => [...prev, ...newPhotos])
+    setPhotos(prev => {
+      const remaining = MAX_PHOTOS - prev.length
+      const toAdd = files.slice(0, remaining)
+      const newPhotos = toAdd.map(file => ({
+        file,
+        preview: URL.createObjectURL(file)
+      }))
+      return [...prev, ...newPhotos]
+    })
     setStep('idle')
   }, [])
 
@@ -144,8 +151,8 @@ export default function WorkerPage() {
         reset()
         setStep('idle')
       }, 3000)
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -183,7 +190,7 @@ export default function WorkerPage() {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Submitted!</h2>
         <p className="text-lg text-gray-600">
-          PO <span className="font-bold" style={{ color: '#006834' }}>{poNumber}</span>
+          PO <span className="font-bold text-brand">{poNumber}</span>
         </p>
         <p className="text-sm text-gray-400 mt-4">Resetting in a moment…</p>
       </div>
@@ -199,8 +206,7 @@ export default function WorkerPage() {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-3">
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-              style={{ backgroundColor: poNumber ? '#006834' : '#6b7280' }}
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${poNumber ? 'bg-brand' : 'bg-gray-500'}`}
             >
               {poNumber ? '✓' : '1'}
             </div>
@@ -209,15 +215,14 @@ export default function WorkerPage() {
 
           {poNumber ? (
             <div className="flex items-center justify-between rounded-xl px-4 py-3" style={{ backgroundColor: '#e8f5ee' }}>
-              <span className="font-bold text-xl" style={{ color: '#006834' }}>{poNumber}</span>
+              <span className="font-bold text-xl text-brand">{poNumber}</span>
               <button onClick={clearPo} className="text-sm text-gray-500 underline">Clear</button>
             </div>
           ) : (
             <>
               <button
                 onClick={() => setStep('scanning')}
-                className="w-full py-4 rounded-xl text-white text-base font-semibold mb-3 active:opacity-90"
-                style={{ backgroundColor: '#006834' }}
+                className="w-full py-4 rounded-xl text-white text-base font-semibold mb-3 active:opacity-90 bg-brand"
               >
                 <span className="text-xl mr-2">▦</span>
                 Scan Barcode
@@ -230,9 +235,7 @@ export default function WorkerPage() {
                   value={poInput}
                   onChange={handlePoInputChange}
                   placeholder="Or type PO number (6–10 digits)"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base text-gray-800 placeholder-gray-400 focus:outline-none"
-                  onFocus={e => e.target.style.borderColor = '#006834'}
-                  onBlur={e => e.target.style.borderColor = '#d1d5db'}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:border-brand"
                   maxLength={10}
                 />
               </div>
@@ -245,16 +248,22 @@ export default function WorkerPage() {
 
         {/* Step 2: Photos */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-3">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-              style={{ backgroundColor: photos.length > 0 ? '#006834' : (poNumber ? '#6b7280' : '#d1d5db') }}
-            >
-              {photos.length > 0 ? '✓' : '2'}
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${photos.length > 0 ? 'bg-brand' : (poNumber ? 'bg-gray-500' : 'bg-gray-300')}`}
+              >
+                {photos.length > 0 ? '✓' : '2'}
+              </div>
+              <h2 className={`font-semibold ${poNumber ? 'text-gray-800' : 'text-gray-400'}`}>
+                Attach Photos {photos.length > 0 && `(${photos.length})`}
+              </h2>
             </div>
-            <h2 className={`font-semibold ${poNumber ? 'text-gray-800' : 'text-gray-400'}`}>
-              Attach Photos {photos.length > 0 && `(${photos.length})`}
-            </h2>
+            {photos.length > 0 && (
+              <span className={`text-xs font-medium ${photos.length >= MAX_PHOTOS ? 'text-red-500' : 'text-gray-400'}`}>
+                {photos.length}/{MAX_PHOTOS}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-2">
@@ -273,27 +282,27 @@ export default function WorkerPage() {
                 </button>
               </div>
             ))}
-            <button
-              onClick={() => setStep('camera')}
-              disabled={!poNumber}
-              className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-colors disabled:opacity-40"
-              style={{
-                borderColor: poNumber ? '#006834' : '#d1d5db',
-                color: poNumber ? '#006834' : '#9ca3af',
-              }}
-            >
-              <span className="text-2xl mb-1">📷</span>
-              <span className="text-xs font-semibold">Add</span>
-            </button>
+            {photos.length < MAX_PHOTOS && (
+              <button
+                onClick={() => setStep('camera')}
+                disabled={!poNumber}
+                className={`aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-colors disabled:opacity-40 ${poNumber ? 'border-brand text-brand' : 'border-gray-300 text-gray-400'}`}
+              >
+                <span className="text-2xl mb-1">📷</span>
+                <span className="text-xs font-semibold">Add</span>
+              </button>
+            )}
           </div>
+          {photos.length >= MAX_PHOTOS && (
+            <p className="text-xs text-red-500 mt-2 px-1">Maximum of {MAX_PHOTOS} photos reached.</p>
+          )}
         </div>
 
         {/* Step 3: Submit */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 mb-3">
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-              style={{ backgroundColor: canSubmit ? '#006834' : '#d1d5db' }}
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${canSubmit ? 'bg-brand' : 'bg-gray-300'}`}
             >
               3
             </div>
@@ -304,13 +313,15 @@ export default function WorkerPage() {
 
           <textarea
             value={notes}
-            onChange={e => setNotes(e.target.value)}
+            onChange={e => setNotes(e.target.value.slice(0, MAX_NOTES_LENGTH))}
             placeholder="Optional notes (damage, quantity, etc.)"
             rows={2}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none resize-none mb-3"
-            onFocus={e => e.target.style.borderColor = '#006834'}
-            onBlur={e => e.target.style.borderColor = '#d1d5db'}
+            maxLength={MAX_NOTES_LENGTH}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-brand resize-none"
           />
+          <p className={`text-xs text-right mb-3 mt-1 ${notes.length >= MAX_NOTES_LENGTH ? 'text-red-500' : 'text-gray-400'}`}>
+            {notes.length}/{MAX_NOTES_LENGTH}
+          </p>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mb-3">
@@ -322,8 +333,7 @@ export default function WorkerPage() {
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="w-full py-4 rounded-xl text-white text-base font-bold transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
-            style={{ backgroundColor: '#006834' }}
+            className="w-full py-4 rounded-xl text-white text-base font-bold transition-opacity disabled:opacity-40 flex items-center justify-center gap-2 bg-brand"
           >
             {submitting ? (
               <>

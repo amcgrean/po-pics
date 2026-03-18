@@ -109,8 +109,8 @@ export default function WorkerSubmissionDetailPage() {
       ])
       setSubmission(updated)
       setAuditLog(Array.isArray(updatedAudit) ? updatedAudit : [])
-    } catch (err: any) {
-      setUploadError(err.message || 'Failed to upload photos')
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload photos')
     } finally {
       setUploadingPhotos(false)
     }
@@ -242,8 +242,7 @@ export default function WorkerSubmissionDetailPage() {
               <button
                 onClick={() => setShowCamera(true)}
                 disabled={uploadingPhotos}
-                className="flex items-center gap-1.5 text-xs font-medium text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
-                style={{ backgroundColor: '#006834' }}
+                className="flex items-center gap-1.5 text-xs font-medium text-white px-3 py-1.5 rounded-lg disabled:opacity-50 bg-brand"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

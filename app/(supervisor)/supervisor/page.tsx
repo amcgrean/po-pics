@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { formatDateTime, isToday } from '@/lib/utils'
 import StatusBadge from '@/components/StatusBadge'
@@ -21,8 +21,18 @@ export default function SupervisorPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [days, setDays] = useState(7)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Debounce search input by 400ms
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase()
+    setSearch(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setDebouncedSearch(val), 400)
+  }
 
   const fetchSubmissions = useCallback(async () => {
     setLoading(true)
@@ -32,7 +42,7 @@ export default function SupervisorPage() {
         days: String(days),
         limit: '100',
       })
-      if (search.trim()) params.set('po_number', search.trim())
+      if (debouncedSearch.trim()) params.set('po_number', debouncedSearch.trim())
 
       const res = await fetch(`/api/submissions?${params}`)
       if (!res.ok) throw new Error('Failed to load')
@@ -42,7 +52,7 @@ export default function SupervisorPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, status, days])
+  }, [debouncedSearch, status, days])
 
   useEffect(() => {
     fetchSubmissions()
@@ -90,7 +100,7 @@ export default function SupervisorPage() {
               type="text"
               placeholder="Search by PO number…"
               value={search}
-              onChange={e => setSearch(e.target.value.toUpperCase())}
+              onChange={handleSearchChange}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-600"
             />
           </div>
@@ -101,7 +111,7 @@ export default function SupervisorPage() {
           >
             <option value="all">All Status</option>
             <option value="submitted">Submitted</option>
-            <option value="pending">Pending (legacy)</option>
+            <option value="pending">Pending</option>
             <option value="reviewed">Reviewed</option>
             <option value="flagged">Flagged</option>
           </select>
@@ -117,8 +127,7 @@ export default function SupervisorPage() {
           </select>
           <button
             onClick={fetchSubmissions}
-            className="px-4 py-2.5 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#006834' }}
+            className="px-4 py-2.5 rounded-lg text-white text-sm font-medium bg-brand"
           >
             Refresh
           </button>

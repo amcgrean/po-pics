@@ -36,7 +36,7 @@ export function generateR2Key(poNumber: string): string {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const timestamp = now.getTime()
-  const uuid = crypto.randomUUID().split('-')[0]
+  const uuid = crypto.randomUUID().replace(/-/g, '')
   const safePo = poNumber.replace(/[^a-zA-Z0-9-_]/g, '_')
   return `submissions/${year}/${month}/${safePo}/${timestamp}-${uuid}.jpg`
 }

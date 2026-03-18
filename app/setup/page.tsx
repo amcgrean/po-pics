@@ -24,6 +24,8 @@ function SetupContent() {
     role: 'worker',
     branch: '',
   })
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showResetPasswords, setShowResetPasswords] = useState<Record<string, boolean>>({})
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [resetting, setResetting] = useState<string | null>(null)
@@ -36,8 +38,8 @@ function SetupContent() {
       const res = await fetch('/api/setup')
       if (!res.ok) throw new Error('Admin access required')
       setUsers(await res.json())
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -63,8 +65,8 @@ function SetupContent() {
       setSuccess(`User "${form.username}" created!`)
       setForm({ username: '', display_name: '', password: '', role: 'worker', branch: '' })
       await loadUsers()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setCreating(false)
     }
@@ -86,8 +88,8 @@ function SetupContent() {
       if (!res.ok) throw new Error(data.error)
       setSuccess(`Password for "${username}" reset successfully.`)
       setResetPasswords(p => { const n = { ...p }; delete n[userId]; return n })
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setResetting(null)
     }
@@ -104,8 +106,8 @@ function SetupContent() {
       })
       if (!res.ok) throw new Error('Failed to delete')
       await loadUsers()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setDeleting(null)
     }
@@ -117,8 +119,7 @@ function SetupContent() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-1">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
-              style={{ backgroundColor: '#006834' }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold bg-brand"
             >
               PO
             </div>
@@ -170,14 +171,24 @@ function SetupContent() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                  placeholder="Choose a password"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-green-600"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    value={form.password}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Choose a password"
+                    className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-green-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showNewPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
@@ -206,8 +217,7 @@ function SetupContent() {
             <button
               type="submit"
               disabled={creating}
-              className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
-              style={{ backgroundColor: '#006834' }}
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 bg-brand"
             >
               {creating ? 'Creating…' : 'Create User'}
             </button>
@@ -276,18 +286,27 @@ function SetupContent() {
                   </div>
                   {resetPasswords[user.id] !== undefined && (
                     <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        value={resetPasswords[user.id]}
-                        onChange={e => setResetPasswords(p => ({ ...p, [user.id]: e.target.value }))}
-                        placeholder="New password"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-green-600"
-                      />
+                      <div className="relative flex-1">
+                        <input
+                          type={showResetPasswords[user.id] ? 'text' : 'password'}
+                          value={resetPasswords[user.id]}
+                          onChange={e => setResetPasswords(p => ({ ...p, [user.id]: e.target.value }))}
+                          placeholder="New password"
+                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-green-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPasswords(p => ({ ...p, [user.id]: !p[user.id] }))}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                          aria-label={showResetPasswords[user.id] ? 'Hide password' : 'Show password'}
+                        >
+                          {showResetPasswords[user.id] ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
                       <button
                         onClick={() => resetPassword(user.id, user.username)}
                         disabled={resetting === user.id || !resetPasswords[user.id]?.trim()}
-                        className="px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50"
-                        style={{ backgroundColor: '#006834' }}
+                        className="px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50 bg-brand"
                       >
                         {resetting === user.id ? '…' : 'Save'}
                       </button>

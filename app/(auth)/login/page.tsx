@@ -54,8 +54,7 @@ export default function LoginPage() {
         {/* Logo / Header */}
         <div className="text-center mb-8">
           <div
-            className="mx-auto mb-4 w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold"
-            style={{ backgroundColor: '#006834' }}
+            className="mx-auto mb-4 w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold bg-brand"
           >
             PO
           </div>
@@ -80,10 +79,7 @@ export default function LoginPage() {
                 onChange={e => setUsername(e.target.value)}
                 placeholder="e.g. jeffw"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent text-base"
-                style={{ focusRingColor: '#006834' } as React.CSSProperties}
-                onFocus={e => e.target.style.boxShadow = '0 0 0 2px #006834'}
-                onBlur={e => e.target.style.boxShadow = 'none'}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-base"
               />
             </div>
 
@@ -99,9 +95,7 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none text-base"
-                onFocus={e => e.target.style.boxShadow = '0 0 0 2px #006834'}
-                onBlur={e => e.target.style.boxShadow = 'none'}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-base"
               />
             </div>
 
@@ -114,8 +108,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || !username || !password}
-              className="w-full py-3 px-4 rounded-xl text-white font-semibold text-base transition-opacity disabled:opacity-50"
-              style={{ backgroundColor: '#006834' }}
+              className="w-full py-3 px-4 rounded-xl text-white font-semibold text-base transition-opacity disabled:opacity-50 bg-brand"
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>

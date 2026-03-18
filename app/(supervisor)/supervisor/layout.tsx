@@ -13,7 +13,7 @@ export default async function SupervisorLayout({ children }: { children: React.R
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="text-white shadow-sm" style={{ backgroundColor: '#006834' }}>
+      <header className="text-white shadow-sm bg-brand">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/supervisor" className="flex items-center gap-2">

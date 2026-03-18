@@ -34,11 +34,13 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         videoRef.current.srcObject = stream
         videoRef.current.onloadedmetadata = () => setCameraReady(true)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const isDenied =
-        err?.name === 'NotAllowedError' ||
-        err?.name === 'PermissionDeniedError' ||
-        err?.message?.toLowerCase().includes('permission')
+        (err instanceof Error && (
+          err.name === 'NotAllowedError' ||
+          err.name === 'PermissionDeniedError' ||
+          err.message.toLowerCase().includes('permission')
+        ))
       if (isDenied) {
         setError(
           'Camera access was denied. iPhone: Settings › Safari › Camera › Allow. Android: tap the lock icon in your browser address bar and enable Camera. Then reload.'
@@ -272,8 +274,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           {capturedFiles.length > 0 && (
             <button
               onClick={confirmPhotos}
-              className="flex-1 py-3 rounded-xl text-white font-semibold text-base active:opacity-90 transition-opacity"
-              style={{ backgroundColor: '#006834' }}
+              className="flex-1 py-3 rounded-xl text-white font-semibold text-base active:opacity-90 transition-opacity bg-brand"
             >
               Done ({capturedFiles.length})
             </button>

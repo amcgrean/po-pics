@@ -27,6 +27,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    if (notes && notes.trim().length > 500) {
+      return NextResponse.json({ error: 'Notes must be 500 characters or fewer' }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('submissions')
       .insert({
