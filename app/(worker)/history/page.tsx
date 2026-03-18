@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import SubmissionCard from '@/components/SubmissionCard'
 
 interface Submission {
@@ -15,6 +16,7 @@ interface Submission {
 }
 
 export default function HistoryPage() {
+  const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +65,7 @@ export default function HistoryPage() {
         {!loading && submissions.length > 0 && (
           <div className="space-y-3">
             {submissions.map(sub => (
-              <SubmissionCard key={sub.id} submission={sub} />
+              <SubmissionCard key={sub.id} submission={sub} onClick={() => router.push(`/history/${sub.id}`)} />
             ))}
           </div>
         )}
