@@ -51,15 +51,83 @@ export async function PATCH(
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, username')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'supervisor') {
+    const isElevated = profile?.role === 'supervisor' || profile?.role === 'manager'
+    const actorUsername = profile?.username || user.email?.split('@')[0]
+
+    const body = await request.json()
+
+    // --- Worker: add photos to own submission ---
+    if (body.action === 'add_photos') {
+      const { new_image_urls, new_image_keys } = body as {
+        new_image_urls: string[]
+        new_image_keys: string[]
+      }
+
+      if (!new_image_urls?.length || !new_image_keys?.length) {
+        return NextResponse.json({ error: 'No photos provided' }, { status: 400 })
+      }
+
+      const { data: existing, error: fetchErr } = await supabase
+        .from('submissions')
+        .select('id, submitted_by, image_urls, image_keys, image_url, image_key')
+        .eq('id', params.id)
+        .single()
+
+      if (fetchErr || !existing) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      }
+
+      if (existing.submitted_by !== user.id && !isElevated) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const updatedUrls = [...(existing.image_urls || []), ...new_image_urls]
+      const updatedKeys = [...(existing.image_keys || []), ...new_image_keys]
+
+      const { data, error } = await supabase
+        .from('submissions')
+        .update({
+          image_urls: updatedUrls,
+          image_keys: updatedKeys,
+          image_url: updatedUrls[0],
+          image_key: updatedKeys[0],
+        })
+        .eq('id', params.id)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await supabase.from('submission_audit_log').insert({
+        submission_id: params.id,
+        action: 'photos_added',
+        changed_by: user.id,
+        changed_by_username: actorUsername,
+        photo_count_added: new_image_urls.length,
+      })
+
+      return NextResponse.json(data)
+    }
+
+    // --- Supervisor / Manager: update status ---
+    if (!isElevated) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
+    const { data: existing, error: fetchErr } = await supabase
+      .from('submissions')
+      .select('status')
+      .eq('id', params.id)
+      .single()
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
     const { status, reviewer_notes } = body
 
     const { data, error } = await supabase
@@ -75,6 +143,16 @@ export async function PATCH(
       .single()
 
     if (error) throw error
+
+    await supabase.from('submission_audit_log').insert({
+      submission_id: params.id,
+      action: 'status_changed',
+      old_status: existing.status,
+      new_status: status,
+      changed_by: user.id,
+      changed_by_username: actorUsername,
+      notes: reviewer_notes?.trim() || null,
+    })
 
     return NextResponse.json(data)
   } catch (error) {

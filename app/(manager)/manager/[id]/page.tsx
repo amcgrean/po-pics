@@ -20,12 +20,24 @@ interface Submission {
   created_at: string
 }
 
+interface AuditEntry {
+  id: string
+  action: string
+  old_status: string | null
+  new_status: string | null
+  changed_by_username: string | null
+  photo_count_added: number | null
+  notes: string | null
+  created_at: string
+}
+
 export default function ManagerSubmissionDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
 
   const [submission, setSubmission] = useState<Submission | null>(null)
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [reviewerNotes, setReviewerNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -35,11 +47,15 @@ export default function ManagerSubmissionDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/submissions/${id}`)
-        if (!res.ok) throw new Error('Not found')
-        const data = await res.json()
-        setSubmission(data)
-        setReviewerNotes(data.reviewer_notes || '')
+        const [subRes, auditRes] = await Promise.all([
+          fetch(`/api/submissions/${id}`),
+          fetch(`/api/submissions/${id}/audit`),
+        ])
+        if (!subRes.ok) throw new Error('Not found')
+        const [subData, auditData] = await Promise.all([subRes.json(), auditRes.json()])
+        setSubmission(subData)
+        setReviewerNotes(subData.reviewer_notes || '')
+        setAuditLog(Array.isArray(auditData) ? auditData : [])
       } catch {
         router.push('/manager')
       } finally {
@@ -60,13 +76,33 @@ export default function ManagerSubmissionDetailPage() {
         body: JSON.stringify({ status: newStatus, reviewer_notes: reviewerNotes }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      const updated = await res.json()
+      const [updated, updatedAudit] = await Promise.all([
+        res.json(),
+        fetch(`/api/submissions/${id}/audit`).then(r => r.json()),
+      ])
       setSubmission(updated)
       setReviewerNotes(updated.reviewer_notes || '')
+      setAuditLog(Array.isArray(updatedAudit) ? updatedAudit : [])
     } catch (err: any) {
       setSaveError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  function auditLabel(entry: AuditEntry): string {
+    switch (entry.action) {
+      case 'created':
+        return `Submitted with ${entry.photo_count_added ?? 0} photo${(entry.photo_count_added ?? 0) !== 1 ? 's' : ''}`
+      case 'photos_added':
+        return `Added ${entry.photo_count_added ?? 0} photo${(entry.photo_count_added ?? 0) !== 1 ? 's' : ''}`
+      case 'status_changed': {
+        const from = entry.old_status ? entry.old_status.charAt(0).toUpperCase() + entry.old_status.slice(1) : '?'
+        const to = entry.new_status ? entry.new_status.charAt(0).toUpperCase() + entry.new_status.slice(1) : '?'
+        return `Status: ${from} → ${to}`
+      }
+      default:
+        return entry.action
     }
   }
 
@@ -83,9 +119,11 @@ export default function ManagerSubmissionDetailPage() {
 
   if (!submission) return null
 
-  const photos = submission.image_urls && submission.image_urls.length > 0 
-    ? submission.image_urls 
+  const photos = submission.image_urls && submission.image_urls.length > 0
+    ? submission.image_urls
     : [submission.image_url]
+
+  const canReset = submission.status === 'reviewed' || submission.status === 'flagged'
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -95,10 +133,10 @@ export default function ManagerSubmissionDetailPage() {
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
           onClick={() => setActiveImageIndex(null)}
         >
-          <img 
-            src={photos[activeImageIndex]} 
-            alt="Full size" 
-            className="max-w-[95%] max-h-[95%] object-contain" 
+          <img
+            src={photos[activeImageIndex]}
+            alt="Full size"
+            className="max-w-[95%] max-h-[95%] object-contain"
           />
           <button
             className="absolute top-4 right-4 text-white text-4xl w-12 h-12 flex items-center justify-center rounded-full bg-black/50"
@@ -106,10 +144,10 @@ export default function ManagerSubmissionDetailPage() {
           >
             ×
           </button>
-          
+
           {photos.length > 1 && (
             <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-4 px-4" onClick={e => e.stopPropagation()}>
-              <button 
+              <button
                 disabled={activeImageIndex === 0}
                 onClick={() => setActiveImageIndex(activeImageIndex - 1)}
                 className="bg-white/10 text-white px-4 py-2 rounded-full disabled:opacity-20"
@@ -119,7 +157,7 @@ export default function ManagerSubmissionDetailPage() {
               <span className="text-white/60 self-center text-sm">
                 {activeImageIndex + 1} / {photos.length}
               </span>
-              <button 
+              <button
                 disabled={activeImageIndex === photos.length - 1}
                 onClick={() => setActiveImageIndex(activeImageIndex + 1)}
                 className="bg-white/10 text-white px-4 py-2 rounded-full disabled:opacity-20"
@@ -146,9 +184,9 @@ export default function ManagerSubmissionDetailPage() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2 text-lg">
-              <span>🖼️</span> Submissions Photos ({photos.length})
+              <span>🖼️</span> Submission Photos ({photos.length})
             </h3>
-            
+
             <div className="space-y-6">
               {photos.map((url, i) => (
                 <div
@@ -163,9 +201,9 @@ export default function ManagerSubmissionDetailPage() {
                     style={{ maxHeight: '600px' }}
                   />
                   <div className="bg-white/80 backdrop-blur-sm py-2 text-center border-t border-gray-100">
-                     <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">
-                        Photo {i + 1} • Click to enlarge
-                      </p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+                      Photo {i + 1} • Click to enlarge
+                    </p>
                   </div>
                 </div>
               ))}
@@ -177,8 +215,8 @@ export default function ManagerSubmissionDetailPage() {
         <div className="space-y-6">
           {/* PO Info */}
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 relative overflow-hidden">
-             <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -mr-16 -mt-16 opacity-50" />
-             
+            <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full -mr-16 -mt-16 opacity-50" />
+
             <div className="flex items-start justify-between mb-8 relative z-10">
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">PO Number</p>
@@ -208,7 +246,7 @@ export default function ManagerSubmissionDetailPage() {
               <div className="mt-8 pt-8 border-t border-gray-100 relative z-10">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Worker Notes</p>
                 <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                   <p className="text-gray-700 italic text-base">"{submission.notes}"</p>
+                  <p className="text-gray-700 italic text-base">"{submission.notes}"</p>
                 </div>
               </div>
             )}
@@ -250,13 +288,13 @@ export default function ManagerSubmissionDetailPage() {
               </button>
             </div>
 
-            {submission.status !== 'pending' && (
+            {canReset && (
               <button
-                onClick={() => updateStatus('pending')}
+                onClick={() => updateStatus('submitted')}
                 disabled={saving}
                 className="w-full mt-4 py-3 bg-white hover:bg-gray-50 text-gray-500 font-bold rounded-2xl text-sm border border-gray-200 transition-all disabled:opacity-50"
               >
-                Reset Status
+                Reset to Submitted
               </button>
             )}
 
@@ -266,6 +304,54 @@ export default function ManagerSubmissionDetailPage() {
               </p>
             )}
           </div>
+
+          {/* Audit History */}
+          {auditLog.length > 0 && (
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">Audit History</h3>
+              <div className="relative">
+                <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-100" />
+                <div className="space-y-5">
+                  {auditLog.map((entry) => (
+                    <div key={entry.id} className="flex gap-4 relative">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex-shrink-0 flex items-center justify-center z-10 mt-0.5">
+                        {entry.action === 'created' && (
+                          <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                        {entry.action === 'photos_added' && (
+                          <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                        {entry.action === 'status_changed' && (
+                          <svg className="w-3 h-3 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pb-1">
+                        <p className="text-base font-medium text-gray-800">{auditLabel(entry)}</p>
+                        <p className="text-sm text-gray-400 mt-0.5">
+                          {entry.changed_by_username && (
+                            <span className="font-semibold text-gray-600">{entry.changed_by_username} · </span>
+                          )}
+                          {formatDateTime(entry.created_at)}
+                        </p>
+                        {entry.notes && (
+                          <div className="mt-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+                            <p className="text-sm text-gray-600 italic">"{entry.notes}"</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

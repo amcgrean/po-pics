@@ -61,7 +61,7 @@ export default function SupervisorPage() {
   }, [fetchSubmissions])
 
   const todayCount = submissions.filter(s => isToday(s.created_at)).length
-  const pendingCount = submissions.filter(s => s.status === 'pending').length
+  const pendingCount = submissions.filter(s => s.status === 'submitted' || s.status === 'pending').length
   const weekCount = submissions.length
 
   return (
@@ -100,7 +100,8 @@ export default function SupervisorPage() {
             className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-600 bg-white"
           >
             <option value="all">All Status</option>
-            <option value="pending">Pending</option>
+            <option value="submitted">Submitted</option>
+            <option value="pending">Pending (legacy)</option>
             <option value="reviewed">Reviewed</option>
             <option value="flagged">Flagged</option>
           </select>
