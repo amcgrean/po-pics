@@ -130,6 +130,10 @@ export async function PATCH(
 
     const { status, reviewer_notes } = body
 
+    if (reviewer_notes && reviewer_notes.trim().length > 500) {
+      return NextResponse.json({ error: 'Reviewer notes must be 500 characters or fewer' }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('submissions')
       .update({

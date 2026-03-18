@@ -72,11 +72,11 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         )
 
         if (mountedRef.current) setIsStarting(false)
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!mountedRef.current) return
 
-        const name = err?.name || ''
-        const msg = (err?.message || String(err)).toLowerCase()
+        const name = err instanceof Error ? err.name : ''
+        const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
 
         if (name === 'NotAllowedError' || msg.includes('permission') || msg.includes('notallowed')) {
           setError(
@@ -114,7 +114,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       if (mountedRef.current) {
         onScan(result)
       }
-    } catch (err: any) {
+    } catch {
       if (mountedRef.current) {
         setError('Could not find a barcode in that photo. Please try another or use the live camera.')
       }

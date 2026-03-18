@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
       .eq('id', data.user.id)
 
     return NextResponse.json({ success: true, userId: data.user.id }, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logError('Create user error', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to create user' },
+      { error: error instanceof Error ? error.message : 'Failed to create user' },
       { status: 500 }
     )
   }

@@ -30,8 +30,7 @@ export default function WorkerHeader() {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 text-white safe-top z-40"
-      style={{ backgroundColor: '#006834' }}
+      className="fixed top-0 left-0 right-0 text-white safe-top z-40 bg-brand"
     >
       <div className="flex items-center justify-between px-4 py-3">
         <div>

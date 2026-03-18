@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { formatDateTime } from '@/lib/utils'
@@ -44,6 +44,23 @@ export default function SubmissionDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null)
 
+  // Keyboard navigation for lightbox
+  const photoCount = (submission?.image_urls && submission.image_urls.length > 0)
+    ? submission.image_urls.length
+    : 1
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (activeImageIndex === null) return
+    if (e.key === 'Escape') setActiveImageIndex(null)
+    if (e.key === 'ArrowRight') setActiveImageIndex(i => (i !== null && i < photoCount - 1 ? i + 1 : i))
+    if (e.key === 'ArrowLeft') setActiveImageIndex(i => (i !== null && i > 0 ? i - 1 : i))
+  }, [activeImageIndex, photoCount])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
   useEffect(() => {
     async function load() {
       try {
@@ -83,8 +100,8 @@ export default function SubmissionDetailPage() {
       setSubmission(updated)
       setReviewerNotes(updated.reviewer_notes || '')
       setAuditLog(Array.isArray(updatedAudit) ? updatedAudit : [])
-    } catch (err: any) {
-      setSaveError(err.message)
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setSaving(false)
     }
@@ -254,11 +271,15 @@ export default function SubmissionDetailPage() {
               <label className="block text-sm text-gray-600 mb-1">Reviewer Notes</label>
               <textarea
                 value={reviewerNotes}
-                onChange={e => setReviewerNotes(e.target.value)}
+                onChange={e => setReviewerNotes(e.target.value.slice(0, 500))}
                 placeholder="Add notes for your records…"
                 rows={3}
+                maxLength={500}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-green-600 resize-none"
               />
+              <p className={`text-xs text-right mt-1 ${reviewerNotes.length >= 500 ? 'text-red-500' : 'text-gray-400'}`}>
+                {reviewerNotes.length}/500
+              </p>
             </div>
 
             {saveError && (
@@ -269,8 +290,7 @@ export default function SubmissionDetailPage() {
               <button
                 onClick={() => updateStatus('reviewed')}
                 disabled={saving}
-                className="flex-1 py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
-                style={{ backgroundColor: '#006834' }}
+                className="flex-1 py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 bg-brand"
               >
                 {saving ? 'Saving…' : '✓ Mark Reviewed'}
               </button>

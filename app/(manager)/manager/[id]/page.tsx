@@ -83,8 +83,8 @@ export default function ManagerSubmissionDetailPage() {
       setSubmission(updated)
       setReviewerNotes(updated.reviewer_notes || '')
       setAuditLog(Array.isArray(updatedAudit) ? updatedAudit : [])
-    } catch (err: any) {
-      setSaveError(err.message)
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setSaving(false)
     }

@@ -9,7 +9,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Permissions-Policy',
-            value: 'camera=*, microphone=()',
+            value: 'camera=(self), microphone=()',
           },
         ],
       },
@@ -17,9 +17,15 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
+      // Cloudflare R2 public buckets (pub-*.r2.dev)
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: '*.r2.dev',
+      },
+      // Custom R2 domains via Cloudflare Workers / custom hostnames
+      {
+        protocol: 'https',
+        hostname: '*.r2.cloudflarestorage.com',
       },
     ],
   },
